@@ -25,11 +25,28 @@ Example: `hypothesis/GH-7-attention-mechanisms`, `synthesis/GH-5-consolidate-tra
 
 ## GitHub Project Tracking
 
+- **Project:** `Research Flow` (project #4, owner: dangquan1402)
+- **Repo:** `dangquan1402/research-flow`
 - Each research goal = parent issue (label: `research-goal`)
 - Each hypothesis/approach = sub-issue under the parent (label: `hypothesis`)
 - Each significant finding = sub-issue (label: `finding`)
-- Use GH Project board columns: `Backlog | In Progress | Synthesizing | Done`
+- Synthesis tasks get label: `synthesis`
+- Memory maintenance gets label: `maintenance`
+- Project board columns: `Backlog | In Progress | Synthesizing | Done`
 - Link all branches to their issues
+- Use `gh project item-add 4 --owner dangquan1402 --url {issue_url}` to add issues to project
+
+### Multi-Agent Dispatch
+
+To spin up parallel hypothesis agents:
+```
+Agent({
+  isolation: "worktree",
+  prompt: "Research goal: {goal}. Your hypothesis angle: {angle}. Branch: hypothesis/GH-{id}-{slug}. Work in memory/ following CLAUDE.md conventions. When done, commit and push.",
+  description: "Hypothesis: {angle}"
+})
+```
+Each agent gets its own worktree (isolated branch). No conflicts during parallel work.
 
 ## Memory Structure
 
@@ -65,11 +82,31 @@ memory/
 4. **Synthesize** (`/synthesize`) — Consolidate findings → build themes → resolve contradictions → produce output
 5. **Lint** (`/lint`) — Health-check memory: orphans, contradictions, staleness, missing cross-refs
 
+## Quality Patterns
+
+### Verification Gates
+Every finding is classified:
+- `source` — directly cited from primary material
+- `analysis` — inference with reasoning chain shown
+- `unverified` — noted but not validated
+- `gap` — explicitly missing information
+
+### FUNGI Counter-Arguments
+Every finding and theme MUST answer: "What would disprove this?"
+This resists confirmation bias and forces rigorous thinking.
+
+### Staleness Scoring
+Pages track `staleness_days` in frontmatter. `/lint` increments this. Pages >30 days stale get flagged.
+
+### Entity Registry
+`memory/entity-registry.json` prevents duplicate entity pages. Always check before creating.
+
 ## Conventions
 
 - Commit messages: `{type}({scope}): description` (e.g., `research(transformers): ingest attention paper`)
 - One finding per file in `findings/`
 - One entity per file in `entities/`
 - Themes can reference multiple findings
-- Sources are immutable after creation
+- Sources are immutable after creation (enforced by hook)
 - Always run `pre-commit` and `ruff` after coding changes
+- Templates for all memory pages in `docs/memory-page-template.md`
