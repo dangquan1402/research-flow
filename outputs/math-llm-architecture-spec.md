@@ -80,7 +80,7 @@ For N-digit operands:
 | FFN dim | 1024 |
 | **Total parameters** | **~3.2M** |
 
-Use this for mixed add+sub+mult training where 2 layers may be insufficient. Validated at 99.90% on addition (Experiment 1).
+**Now the primary recommendation for multiplication and mixed operations.** 4L/256D achieves 94.9% on 3-digit mult (+9.75pp over 2L/384D). Use this whenever multiplication is included.
 
 ### Parameter-Minimal Configuration (V1-min)
 
@@ -107,13 +107,31 @@ Replace Abacus with:
 - **Positional encoding**: Position Coupling — assign same position IDs to digits of equal significance across operands and result [length-generalization-techniques]
 - **Expected**: Train on 1-30 digit addition, generalize to 200 digits
 
-### Architecture Decision: Why 2 Layers?
+### Operation-Specific Architecture Recommendation
 
-**Literature**: "The Depth Delusion" (2026) shows width should grow 2.8x faster than depth. [depth-vs-width]
+| Operation | Recommended Config | Accuracy | Rationale |
+|---|---|---|---|
+| **Addition** | V1 (2L/384D) | 99.9% | Width-dominated; 2 layers sufficient for single carry chain |
+| **Subtraction** | V1 (2L/384D) | 99.9% | Identical difficulty to addition — borrow = carry |
+| **Multiplication** | V1-safe (4L/256D) | 94.9% | Depth-critical; partial-product accumulation needs more layers |
+| **Mixed (all 3)** | V1-safe (4L/256D) | TBD | Must accommodate hardest operation (multiplication) |
 
-**Our experiments confirm**: In Experiment 3, all four architectures (2L through 8L) achieved >99.5% on 5-digit addition. The 2L/4H/384D config was the fastest to 100% (epoch 20) and the most training-stable. The 8L/4H/128D config was competitive (99.95%) but showed training instability (accuracy dipped to 90% at epoch 20 before recovering). Going beyond 384D (to 512D with 8 heads) doubled training time with no accuracy gain.
+### Architecture Decision: Why Operation Matters
 
-**Key experimental insight**: For 5-digit addition with reversed output and balanced carry sampling, **data format matters more than architecture**. All configs exceeded the 99% target. The architecture choice is about convergence speed and stability, not accuracy ceiling.
+**Addition/Subtraction — shallow and wide (2L/384D)**:
+- "The Depth Delusion" (2026) shows width grows 2.8x faster than depth for algorithmic tasks. [depth-vs-width]
+- Experiment 3 confirmed: 2L/4H/384D is the fastest to 100% (epoch 20) on 5-digit add.
+- Subtraction (Experiment 4): 99.9% — identical to addition. Borrow is computationally equivalent to carry.
+
+**Multiplication — depth wins (4L/256D)**:
+- Experiment 5: 2L/384D achieved only 85.15% on 3-digit multiplication.
+- Experiment 6: 4L/256D achieved **94.9%** — a **+9.75pp improvement** with 11% fewer parameters.
+- The accuracy cliff tells the story: on 6-digit results, 4L gets 60% vs 2L's 32%.
+- Multiplication requires multi-step partial-product accumulation — each layer provides one "computation step."
+- **Depth >> width for multiplication**: more layers = more sequential computation steps.
+- 4L is still not fully solved (60% on 6-digit results) — scratchpad is the likely next unlock.
+
+**Key insight**: The "data format > architecture" finding holds for add/sub but NOT for multiplication. For mult, architecture depth is a genuine bottleneck.
 
 ---
 

@@ -77,3 +77,34 @@
 - Key insight: balanced carry sampling closes 13% of the reversed-vs-plain gap (97.85% vs literature's 85%)
 - Commented on GH-1 with final results summary
 - Agent: synthesizer
+
+## [2026-04-13] experiment | Subtraction — 5-digit, 2L/384D
+- Model: 2L/4H/384D (3.56M params), MLX on Apple M4
+- Result: 99.90% accuracy, 461s training
+- Identical to addition — borrow = carry computationally
+- Findings created: experiment-subtraction-5digit
+- Agent: experimenter
+
+## [2026-04-13] experiment | Multiplication baseline — 3-digit, 2L/384D (no scratchpad)
+- Model: 2L/4H/384D (3.56M params), MLX on Apple M4
+- Result: 85.15% accuracy, 607s training
+- Accuracy cliff by output length: 1-3d=100%, 4d=96%, 5d=66%, 6d=32%
+- Multiplication fundamentally harder — model capacity-limited at 2 layers
+- Findings created: experiment-multiplication-baseline
+- Agent: experimenter
+
+## [2026-04-13] experiment | Multiplication deep — 3-digit, 4L/256D
+- Model: 4L/4H/256D (3.16M params), MLX on Apple M4
+- Result: 94.90% accuracy, 664s training — +9.75pp over 2L/384D
+- 5d=93%, 6d=60% (vs 2L: 5d=66%, 6d=32%)
+- Depth >> width for multiplication; partial-product accumulation needs layers
+- Still not fully solved at 6-digit — scratchpad likely needed
+- Findings created: experiment-multiplication-4L256D
+- Agent: experimenter
+
+## [2026-04-13] update | Spec updated with sub/mul experimental results
+- Operation-specific architecture recommendation added
+- Add/Sub: 2L/384D (99.9%), Mul: 4L/256D (94.9%)
+- Key finding: "data format > architecture" holds for add/sub but NOT multiplication
+- V1-safe promoted to primary config for multiplication workloads
+- Agent: team-lead
