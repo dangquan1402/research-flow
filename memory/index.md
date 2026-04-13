@@ -49,7 +49,16 @@
 
 ## Themes
 
-_No themes yet — pending synthesis._
+- [Data Format Supremacy](themes/data-format-supremacy.md) — Formatting decisions (reversed output, digit-level tokenization) outweigh all architecture choices | high | 2026-04-13
+- [Shallow and Wide Architecture](themes/shallow-wide-architecture.md) — 2-4 layers with 4+ heads is optimal; width grows 2.8x faster than depth | high | 2026-04-13
+- [Position Encoding Unlocks Generalization](themes/position-encoding-unlocks-generalization.md) — Standard PEs fail; Abacus/Position Coupling enable 6-7x length generalization | high | 2026-04-13
+- [Training Data Distribution](themes/training-data-distribution.md) — Balanced carry sampling and augmentation matter as much as dataset volume | high | 2026-04-13
+- [Regularization Drives Generalization](themes/regularization-drives-generalization.md) — Weight decay 0.1-1.0 controls memorization→algorithm transition (grokking) | high | 2026-04-13
+
+### Experimental Results (2026-04-13)
+- [Baseline Addition Reversed](findings/experiment-baseline-addition-reversed.md) — 4L/4H/256D achieves 99.9% on 5-digit addition with reversed output | high | 2026-04-13
+- [Tokenization Comparison](findings/experiment-tokenization-comparison.md) — Reversed +2% accuracy and 2x learning speed over plain output | high | 2026-04-13
+- [Depth vs Width Ablation](findings/experiment-depth-vs-width-ablation.md) — 2L/4H/384D is sweet spot; all configs >99.5% on addition | high | 2026-04-13
 
 ## Open Questions
 
