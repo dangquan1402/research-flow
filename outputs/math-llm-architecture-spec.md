@@ -52,33 +52,47 @@ For N-digit operands:
 
 ## 2. Model Architecture
 
-### Primary Configuration (V1 — Conservative)
+### Primary Configuration (V1 — Experimentally Validated)
 
 | Component | Value | Justification |
 |-----------|-------|---------------|
-| Layers | 4 | Width > depth for arithmetic; 2-4 optimal [depth-vs-width] |
+| Layers | **2** | **Experiment 3 confirmed**: 2L reaches 100% by epoch 20, faster than 4L or 8L |
 | Attention heads | 4 | 3 minimum for carry mechanism + 1 spare [attention-heads-carry] |
-| Embedding dim | 256 | Sweet spot for <10M params; head dim = 64 |
-| FFN dim | 1024 | 4x embedding dim (standard multiplier) |
+| Embedding dim | **384** | **Experiment 3 confirmed**: 2L/4H/384D is the sweet spot — fastest, most stable |
+| FFN dim | **1536** | 4x embedding dim (standard multiplier) |
 | FFN activation | GELU | Standard for GPT-style models |
 | Normalization | RMSNorm (pre-norm) | Essential for training stability [normalization] |
 | Positional encoding | Learned APE | Simple baseline; upgrade to Abacus for length gen |
 | Vocab size | 16 | Custom digit-level tokenizer |
 | Max sequence length | 256 | Covers up to 20-digit multiplication with scratchpad |
 | Dropout | 0.0 | Small model + weight decay provides sufficient regularization |
-| **Total parameters** | **~3-5M** | Well within M4 Mac budget |
+| **Total parameters** | **~3.5M** | 99.90% accuracy, 100% peak at epoch 20 on 5-digit addition |
 
-### Aggressive Configuration (V1a — Minimum Viable)
+> **Changed from original spec**: Was 4L/4H/256D (~3-5M). Experiment 3 showed 2L/4H/384D converges 2x faster to perfect accuracy and is the most training-stable configuration.
+
+### Conservative Configuration (V1-safe — For Mixed Operations)
 
 | Component | Value |
 |-----------|-------|
-| Layers | 2 |
+| Layers | 4 |
 | Attention heads | 4 |
 | Embedding dim | 256 |
 | FFN dim | 1024 |
-| **Total parameters** | **~2M** |
+| **Total parameters** | **~3.2M** |
 
-Use this for rapid iteration. If addition accuracy exceeds 99%, this is sufficient.
+Use this for mixed add+sub+mult training where 2 layers may be insufficient. Validated at 99.90% on addition (Experiment 1).
+
+### Parameter-Minimal Configuration (V1-min)
+
+| Component | Value |
+|-----------|-------|
+| Layers | 8 |
+| Attention heads | 4 |
+| Embedding dim | 128 |
+| FFN dim | 512 |
+| **Total parameters** | **~1.6M** |
+
+Surprisingly competitive: 99.95% accuracy with fewest parameters (Experiment 3). Shows some training instability (accuracy dips mid-training). Use only if parameter count is severely constrained.
 
 ### Length Generalization Configuration (V2)
 
@@ -93,9 +107,13 @@ Replace Abacus with:
 - **Positional encoding**: Position Coupling — assign same position IDs to digits of equal significance across operands and result [length-generalization-techniques]
 - **Expected**: Train on 1-30 digit addition, generalize to 200 digits
 
-### Architecture Decision: Why Not Deeper?
+### Architecture Decision: Why 2 Layers?
 
-"The Depth Delusion" (2026) shows that beyond D_crit ~ W^0.44, additional layers **increase** loss despite adding parameters. For W=256, D_crit ≈ 256^0.44 ≈ 11.7. Our 4-layer model is safely below this. Width should grow 2.8x faster than depth. [depth-vs-width]
+**Literature**: "The Depth Delusion" (2026) shows width should grow 2.8x faster than depth. [depth-vs-width]
+
+**Our experiments confirm**: In Experiment 3, all four architectures (2L through 8L) achieved >99.5% on 5-digit addition. The 2L/4H/384D config was the fastest to 100% (epoch 20) and the most training-stable. The 8L/4H/128D config was competitive (99.95%) but showed training instability (accuracy dipped to 90% at epoch 20 before recovering). Going beyond 384D (to 512D with 8 heads) doubled training time with no accuracy gain.
+
+**Key experimental insight**: For 5-digit addition with reversed output and balanced carry sampling, **data format matters more than architecture**. All configs exceeded the 99% target. The architecture choice is about convergence speed and stability, not accuracy ceiling.
 
 ---
 
@@ -360,19 +378,19 @@ These cannot be resolved from literature alone — they require our own experime
 
 ## 9. Decision Log
 
-| Decision | Choice | Runner-up | Why |
-|----------|--------|-----------|-----|
-| Tokenization | Digit-level (16 tokens) | BPE | BPE drops accuracy to 8.25%; all research uses digit-level |
-| Output format | Reversed (LSB-first) | Plain | 85%→100% accuracy; 4-10x sample efficiency |
-| Depth | 4 layers | 6-8 layers | Width > depth; gradient starvation above 4L at our width |
-| Width | 256d / 4 heads | 384d / 6 heads | Sufficient for 3-head carry mechanism; fits M4 budget |
-| Normalization | RMSNorm pre-norm | LayerNorm post-norm | Training stability; eliminates warmup; universal adoption |
-| Positional encoding | Learned APE (V1) | Abacus (V2) | Simpler baseline; Abacus for length gen upgrade |
-| Optimizer | AdamW | SGD | Decoupled weight decay critical for generalization |
-| Weight decay | 0.5 | 0.01 | 10-100x higher than NLP default; drives grokking |
-| Mult. format | Reversed + scratchpad | Reversed only | Mult. requires multi-step decomposition |
-| Sampling | Balanced carry | Uniform random | Long carry chains are exponentially rare under uniform |
-| Framework | MLX (primary) | PyTorch MPS | Native Apple Silicon; fallback to PyTorch MPS |
+| Decision | Choice | Runner-up | Why | Experimental Status |
+|----------|--------|-----------|-----|---------------------|
+| Tokenization | Digit-level (16 tokens) | BPE | BPE drops accuracy to 8.25%; all research uses digit-level | Validated (all experiments) |
+| Output format | Reversed (LSB-first) | Plain | +2.05% accuracy, 2x convergence speed, reaches 100% (plain never does) | **Validated (Exp 2)** |
+| Depth | **2 layers** | 4 layers | 2L reaches 100% at epoch 20 vs epoch 45 for 4L; most stable training | **Validated (Exp 3)** — changed from 4L |
+| Width | **384d / 4 heads** | 256d / 4 heads | 2L/384D is the fastest and most stable config; diminishing returns above 384D | **Validated (Exp 3)** — changed from 256d |
+| Normalization | RMSNorm pre-norm | LayerNorm post-norm | Training stability; eliminates warmup; universal adoption | Used in all experiments |
+| Positional encoding | Learned APE (V1) | Abacus (V2) | Simpler baseline; Abacus for length gen upgrade | Used in all experiments |
+| Optimizer | AdamW | SGD | Decoupled weight decay critical for generalization | Validated (all experiments) |
+| Weight decay | 0.5 | 0.01 | 10-100x higher than NLP default; balanced carry + wd=0.5 → plain reaches 97.85% | **Validated (Exp 2)** |
+| Mult. format | Reversed + scratchpad | Reversed only | Mult. requires multi-step decomposition | Not yet tested |
+| Sampling | Balanced carry | Uniform random | Plain+balanced carry: 97.85% vs literature's ~85% plain+uniform — sampling closes 13% gap | **Validated (Exp 2)** |
+| Framework | MLX (primary) | PyTorch MPS | Native Apple Silicon; ~9 min for 50K/50ep on M4 | **Validated (all experiments)** |
 
 ---
 

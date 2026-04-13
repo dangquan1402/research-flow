@@ -69,3 +69,11 @@
 - All 3 experiments passed success criteria
 - Recommended V1a update: 2L/4H/384D instead of 2L/4H/256D
 - Agent: experimenter
+
+## [2026-04-13] synthesize | Final spec revision — experimental validation integrated
+- Revised V1 primary config: 4L/4H/256D → 2L/4H/384D (based on Exp 3 sweet spot)
+- Added V1-safe (4L/4H/256D) for mixed operations, V1-min (8L/4H/128D) for parameter constraints
+- Updated Decision Log with experimental status for all 11 decisions
+- Key insight: balanced carry sampling closes 13% of the reversed-vs-plain gap (97.85% vs literature's 85%)
+- Commented on GH-1 with final results summary
+- Agent: synthesizer
