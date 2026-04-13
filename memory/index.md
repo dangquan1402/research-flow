@@ -55,10 +55,13 @@
 - [Training Data Distribution](themes/training-data-distribution.md) — Balanced carry sampling and augmentation matter as much as dataset volume | high | 2026-04-13
 - [Regularization Drives Generalization](themes/regularization-drives-generalization.md) — Weight decay 0.1-1.0 controls memorization→algorithm transition (grokking) | high | 2026-04-13
 
-### Experimental Results (2026-04-13)
+### Experimental Results (2026-04-13 — 2026-04-14)
 - [Baseline Addition Reversed](findings/experiment-baseline-addition-reversed.md) — 4L/4H/256D achieves 99.9% on 5-digit addition with reversed output | high | 2026-04-13
 - [Tokenization Comparison](findings/experiment-tokenization-comparison.md) — Reversed +2% accuracy and 2x learning speed over plain output | high | 2026-04-13
 - [Depth vs Width Ablation](findings/experiment-depth-vs-width-ablation.md) — 2L/4H/384D is sweet spot; all configs >99.5% on addition | high | 2026-04-13
+- [Scratchpad Format Research](findings/scratchpad-format-research.md) — Aligned reversed partial products optimal; minimizes tokens while keeping steps simple | high | 2026-04-14
+- [Scratchpad 4L/256D](findings/experiment-scratchpad-4L256D.md) — Scratchpad pushes 4L/256D mult from 94.9% to 100%; 6-digit: 60%→100% | high | 2026-04-14
+- [Scratchpad 2L/384D](findings/experiment-scratchpad-2L384D.md) — **Key result**: scratchpad makes 2L viable for mult (85%→100%); unified arch | high | 2026-04-14
 
 ## Open Questions
 

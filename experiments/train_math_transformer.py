@@ -56,14 +56,15 @@ print(f"Using framework: {FRAMEWORK}")
 
 # ── Tokenizer ────────────────────────────────────────────────────────────────
 
-# Vocab: 0-9, +, -, *, =, <pad>, <eos>, <bos>
-TOKENS = list("0123456789+-*=") + ["<pad>", "<eos>", "<bos>"]
+# Vocab: 0-9, +, -, *, =, <pad>, <eos>, <bos>, | (scratchpad step separator)
+TOKENS = list("0123456789+-*=") + ["<pad>", "<eos>", "<bos>", "|"]
 TOK2ID = {t: i for i, t in enumerate(TOKENS)}
 ID2TOK = {i: t for t, i in TOK2ID.items()}
 VOCAB_SIZE = len(TOKENS)
 PAD_ID = TOK2ID["<pad>"]
 EOS_ID = TOK2ID["<eos>"]
 BOS_ID = TOK2ID["<bos>"]
+SEP_ID = TOK2ID["|"]
 OP_MAP = {"add": "+", "sub": "-", "mul": "*"}
 
 
@@ -122,8 +123,40 @@ def sample_balanced_digits(max_digits: int) -> tuple[int, int]:
     return a, b
 
 
+def generate_scratchpad_mul(a: int, b: int) -> str:
+    """Generate scratchpad steps for a * b using aligned reversed partial products.
+
+    Format: partial1|partial2|...|final_answer (all reversed/LSB-first)
+    Each partial product = (digit_i of b) * a, shifted by i positions.
+    Shift is represented as i leading zeros in the reversed representation.
+
+    Example: 12 * 34 = 408
+      4*12=48 (shift 0) reversed: "84"
+      3*12=36 (shift 1) → 360 reversed: "063"
+      final: 408 reversed: "804"
+      Output: "84|063|804"
+    """
+    b_digits = [int(d) for d in str(b)][::-1]  # LSB-first digits of b
+    partial_products = []
+    for i, d in enumerate(b_digits):
+        pp = d * a  # single-digit * multi-digit
+        shifted = pp * (10**i)  # shift by position
+        pp_str = str(shifted)[::-1]  # reverse
+        # Ensure leading zeros for shift (reversed = trailing zeros become leading)
+        # The reversed shifted value naturally has the right zeros
+        partial_products.append(pp_str)
+
+    result = a * b
+    result_str = str(result)[::-1]
+    return "|".join(partial_products) + "|" + result_str
+
+
 def generate_example(
-    op: str, max_digits: int, reverse_output: bool = True, balanced_carry: bool = True
+    op: str,
+    max_digits: int,
+    reverse_output: bool = True,
+    balanced_carry: bool = True,
+    scratchpad: bool = False,
 ) -> tuple[str, str, int]:
     """Generate one arithmetic example.
 
@@ -150,11 +183,17 @@ def generate_example(
         raise ValueError(f"Unknown op: {op}")
 
     op_sym = OP_MAP[op]
-    result_str = str(result)
-    if reverse_output:
-        result_str = result_str[::-1]
 
-    seq = f"{a}{op_sym}{b}={result_str}"
+    if scratchpad and op == "mul" and a > 0 and b > 0:
+        # Scratchpad format: partial products + final answer (all reversed)
+        scratch_str = generate_scratchpad_mul(a, b)
+        seq = f"{a}{op_sym}{b}={scratch_str}"
+    else:
+        result_str = str(result)
+        if reverse_output:
+            result_str = result_str[::-1]
+        seq = f"{a}{op_sym}{b}={result_str}"
+
     input_part = f"{a}{op_sym}{b}="
     return input_part, seq, result
 
@@ -165,6 +204,7 @@ def generate_dataset(
     n_samples: int,
     reverse_output: bool = True,
     balanced_carry: bool = True,
+    scratchpad: bool = False,
 ) -> list[tuple[str, str, int]]:
     """Generate a dataset of arithmetic examples."""
     seen = set()
@@ -172,7 +212,9 @@ def generate_dataset(
     attempts = 0
     while len(data) < n_samples and attempts < n_samples * 10:
         attempts += 1
-        inp, seq, ans = generate_example(op, max_digits, reverse_output, balanced_carry)
+        inp, seq, ans = generate_example(
+            op, max_digits, reverse_output, balanced_carry, scratchpad
+        )
         if seq not in seen:
             seen.add(seq)
             data.append((inp, seq, ans))
@@ -307,13 +349,26 @@ if FRAMEWORK == "mlx":
         # Generate data
         reverse = args.tokenizer == "reversed"
         balanced = args.balanced_carry
+        use_scratchpad = args.scratchpad
 
         print(f"Generating {args.train_samples} training examples...")
+        if use_scratchpad:
+            print("Scratchpad mode enabled for multiplication")
         train_data = generate_dataset(
-            args.op, args.max_digits, args.train_samples, reverse, balanced
+            args.op,
+            args.max_digits,
+            args.train_samples,
+            reverse,
+            balanced,
+            use_scratchpad,
         )
         test_data = generate_dataset(
-            args.op, args.max_digits, args.test_samples, reverse, balanced
+            args.op,
+            args.max_digits,
+            args.test_samples,
+            reverse,
+            balanced,
+            use_scratchpad,
         )
         print(f"Generated {len(train_data)} train, {len(test_data)} test examples")
 
@@ -321,7 +376,8 @@ if FRAMEWORK == "mlx":
         max_len = (
             max(len(seq) for _, seq, _ in train_data + test_data) + 2
         )  # +2 for BOS/EOS
-        max_len = min(max_len, 64)  # Cap at 64
+        seq_cap = 128 if use_scratchpad else 64
+        max_len = min(max_len, seq_cap)
 
         # Encode
         train_seqs = pad_and_encode([seq for _, seq, _ in train_data], max_len)
@@ -378,6 +434,8 @@ if FRAMEWORK == "mlx":
             "max_digits": args.max_digits,
             "tokenizer": args.tokenizer,
             "balanced_carry": args.balanced_carry,
+            "scratchpad": use_scratchpad,
+            "max_seq_len": max_len,
             "n_layers": args.n_layers,
             "n_heads": args.n_heads,
             "dim": args.dim,
@@ -430,7 +488,13 @@ if FRAMEWORK == "mlx":
             digit_accuracy = {}
             if epoch % args.eval_every == 0 or epoch == args.epochs:
                 accuracy, digit_accuracy = evaluate_mlx(
-                    model, test_inputs, test_answers, max_len, reverse, args.op
+                    model,
+                    test_inputs,
+                    test_answers,
+                    max_len,
+                    reverse,
+                    args.op,
+                    use_scratchpad,
                 )
 
             log = {
@@ -466,7 +530,9 @@ if FRAMEWORK == "mlx":
 
         return results
 
-    def evaluate_mlx(model, test_inputs, test_answers, max_len, reverse, op):
+    def evaluate_mlx(
+        model, test_inputs, test_answers, max_len, reverse, op, scratchpad=False
+    ):
         """Evaluate model accuracy via greedy autoregressive decoding."""
         correct = 0
         total = 0
@@ -498,8 +564,12 @@ if FRAMEWORK == "mlx":
             pred_ids = ids_arr[0, len([BOS_ID] + encode(inp_str)) :].tolist()
             pred_str = decode(pred_ids)
 
-            # Reverse back if needed
-            if reverse:
+            # For scratchpad, extract final answer (after last |)
+            if scratchpad and "|" in pred_str:
+                pred_str = pred_str.split("|")[-1]
+
+            # Reverse back if needed (always reversed in scratchpad mode too)
+            if reverse or scratchpad:
                 pred_str = pred_str[::-1]
 
             try:
@@ -599,18 +669,32 @@ if FRAMEWORK == "pytorch":
 
         reverse = args.tokenizer == "reversed"
         balanced = args.balanced_carry
+        use_scratchpad = args.scratchpad
 
         print(f"Generating {args.train_samples} training examples...")
+        if use_scratchpad:
+            print("Scratchpad mode enabled for multiplication")
         train_data = generate_dataset(
-            args.op, args.max_digits, args.train_samples, reverse, balanced
+            args.op,
+            args.max_digits,
+            args.train_samples,
+            reverse,
+            balanced,
+            use_scratchpad,
         )
         test_data = generate_dataset(
-            args.op, args.max_digits, args.test_samples, reverse, balanced
+            args.op,
+            args.max_digits,
+            args.test_samples,
+            reverse,
+            balanced,
+            use_scratchpad,
         )
         print(f"Generated {len(train_data)} train, {len(test_data)} test examples")
 
         max_len = max(len(seq) for _, seq, _ in train_data + test_data) + 2
-        max_len = min(max_len, 64)
+        seq_cap = 128 if use_scratchpad else 64
+        max_len = min(max_len, seq_cap)
 
         train_seqs = pad_and_encode([seq for _, seq, _ in train_data], max_len)
         test_inputs = [inp for inp, _, _ in test_data]
@@ -721,6 +805,7 @@ if FRAMEWORK == "pytorch":
                         reverse,
                         args.op,
                         device,
+                        use_scratchpad,
                     )
 
             log = {
@@ -756,7 +841,14 @@ if FRAMEWORK == "pytorch":
         return results
 
     def evaluate_pytorch(
-        model, test_inputs, test_answers, max_len, reverse, op, device
+        model,
+        test_inputs,
+        test_answers,
+        max_len,
+        reverse,
+        op,
+        device,
+        scratchpad=False,
     ):
         correct = 0
         total = 0
@@ -784,7 +876,11 @@ if FRAMEWORK == "pytorch":
             pred_ids = ids_t[0, len([BOS_ID] + encode(inp_str)) :].tolist()
             pred_str = decode(pred_ids)
 
-            if reverse:
+            # For scratchpad, extract final answer (after last |)
+            if scratchpad and "|" in pred_str:
+                pred_str = pred_str.split("|")[-1]
+
+            if reverse or scratchpad:
                 pred_str = pred_str[::-1]
 
             try:
@@ -827,6 +923,12 @@ def main():
     )
     parser.add_argument(
         "--balanced_carry", type=bool, default=True, help="Use balanced carry sampling"
+    )
+    parser.add_argument(
+        "--scratchpad",
+        action="store_true",
+        default=False,
+        help="Enable scratchpad (intermediate steps) for multiplication",
     )
 
     # Architecture

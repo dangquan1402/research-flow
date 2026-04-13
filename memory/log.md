@@ -108,3 +108,35 @@
 - Key finding: "data format > architecture" holds for add/sub but NOT multiplication
 - V1-safe promoted to primary config for multiplication workloads
 - Agent: team-lead
+
+## [2026-04-14] analyze | Scratchpad format research
+- Researched scratchpad formats from Lee et al. (ICLR 2024), ICoT (Deng 2024), and others
+- Recommended format: aligned reversed partial products with `|` separator
+- Each partial product = single-digit × multi-digit (easy), shifted by position (zero-prepend)
+- ~2.3x sequence length overhead for 3-digit multiplication
+- Findings created: scratchpad-format-research
+- Agent: scratchpad-engineer
+
+## [2026-04-14] experiment | Multiplication scratchpad — 4L/256D
+- Model: 4L/4H/256D (3.17M params), MLX on Apple M4
+- Result: **100.00%** accuracy (peak at epoch 70), 2340s training
+- 6-digit results: 60% → 100% (vs non-scratchpad baseline)
+- +5.1pp over non-scratchpad (94.9% → 100%)
+- Findings created: experiment-scratchpad-4L256D
+- Agent: scratchpad-engineer
+
+## [2026-04-14] experiment | Multiplication scratchpad — 2L/384D
+- Model: 2L/4H/384D (3.57M params), MLX on Apple M4
+- Result: **100.00%** accuracy (first 100% at epoch 35), 1970s training
+- 6-digit results: 32% → 100% (+68pp, most dramatic improvement)
+- +14.85pp over non-scratchpad (85.15% → 100%)
+- **KEY RESULT**: scratchpad eliminates depth bottleneck — 2L/384D now universal
+- Findings created: experiment-scratchpad-2L384D
+- Agent: scratchpad-engineer
+
+## [2026-04-14] update | Spec updated with scratchpad results
+- Operation-specific architecture recommendation unified: 2L/384D for all ops
+- Scratchpad format validated and documented
+- Decision log updated: mult format validated
+- Open question #1 (scratchpad format) marked resolved
+- Agent: scratchpad-engineer
