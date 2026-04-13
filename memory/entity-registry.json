@@ -1,0 +1,5 @@
+{
+  "_description": "Canonical entity registry. Prevents duplicate pages with different names. Check before creating any entity.",
+  "_format": "{ canonical_name: { aliases: [], file: 'entities/slug.md', type: 'person|org|concept|tool|paper' } }",
+  "entities": {}
+}
