@@ -128,10 +128,10 @@ def train_mlx(args):
     train_x = mx.array(np.array(train_seqs, dtype=np.int32))
 
     # Model
-    # Adjust ff_dim for SwiGLU (3 weight matrices instead of 2)
+    # For SwiGLU, ff_dim is used directly (user should pass the desired inner dim).
+    # SwiGLU uses 3 matrices of size (dim, ff_dim) vs GELU's 2 matrices of (dim, ff_dim).
+    # To match GELU param count at ff_dim=1536, use --ff_dim 1024 --activation swiglu.
     ff_dim = args.ff_dim
-    if args.activation == "swiglu":
-        ff_dim = int(args.ff_dim * 2 / 3)  # Compensate for extra matrix
 
     use_looped = getattr(args, "looped", False)
     n_loops = getattr(args, "n_loops", 4)
