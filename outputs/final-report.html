@@ -217,7 +217,7 @@
 
 <div class="meta">
   <span>Duration: Apr 13&ndash;14, 2026</span>
-  <span>Method: Literature (21 findings, 12+ papers) + 8 experiments</span>
+  <span>Method: Literature (21 findings, 12+ papers) + 12 experiments</span>
   <span>Hardware: Apple M4 / MLX</span>
   <span>Repo: <a href="https://github.com/dangquan1402/research-flow">dangquan1402/research-flow</a></span>
 </div>
@@ -395,6 +395,59 @@ Output: 8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;
 
 <p>Scratchpad eliminates the depth bottleneck entirely. 2L becomes universal.</p>
 
+<h3>Looped Transformer: 7.8&times; Smaller</h3>
+
+<table>
+  <thead><tr><th>Config</th><th>Params</th><th>Add (5d)</th><th>Mul+Scratch (3d)</th></tr></thead>
+  <tbody>
+    <tr class="highlight-row"><td>1Lx4loop / 4H / 192D</td><td><strong>454K</strong></td><td><strong>99.2%</strong></td><td><strong>99.4%</strong></td></tr>
+    <tr><td>1Lx4loop / 4H / 128D</td><td>204K</td><td>37.7%</td><td>&mdash;</td></tr>
+    <tr><td>Baseline 2L / 4H / 384D</td><td>3,560K</td><td>99.9%</td><td>100%</td></tr>
+  </tbody>
+</table>
+
+<p>Weight-tied looped transformer: 1 layer block repeated 4 times with input injection and progressive loss. <strong>454K params achieves &gt;99% on both operations</strong> &mdash; 7.8&times; smaller than baseline with &lt;1% accuracy loss. Sharp capacity cliff at 128D (37.7%) establishes the minimum viable width.</p>
+
+<h3>Activation Functions</h3>
+
+<table>
+  <thead><tr><th>Activation</th><th>Params</th><th>Epochs to 95%</th><th>Epochs to 100%</th><th>Final Accuracy</th></tr></thead>
+  <tbody>
+    <tr class="highlight-row"><td><strong>GELU</strong></td><td>3.56M</td><td>10</td><td><strong>20</strong></td><td><strong>99.95%</strong></td></tr>
+    <tr><td>SwiGLU</td><td>2.77M*</td><td><strong>5</strong></td><td>never</td><td>99.75%</td></tr>
+    <tr><td>ReLU&sup2;</td><td>3.56M</td><td>10</td><td>never</td><td>98.80%</td></tr>
+  </tbody>
+</table>
+
+<p style="font-size: 0.85rem; color: var(--muted);">*SwiGLU had a double FFN-dim reduction bug resulting in fewer params. Per-param efficiency is notable regardless.</p>
+
+<p>GELU remains the best activation &mdash; the only one to reach 100% accuracy.</p>
+
+<h3>Encoder-Decoder vs Decoder-Only</h3>
+
+<table>
+  <thead><tr><th>Task</th><th>Encoder-Decoder (4.15M)</th><th>Decoder-Only (3.57M)</th></tr></thead>
+  <tbody>
+    <tr><td>Addition (first 100%)</td><td><strong>Epoch 15</strong></td><td>Epoch 20</td></tr>
+    <tr><td>Addition (final)</td><td>99.65%</td><td><strong>99.9%</strong></td></tr>
+    <tr><td>Mul + Scratchpad</td><td>87.8%</td><td><strong>100%</strong></td></tr>
+  </tbody>
+</table>
+
+<p>Encoder-decoder converges faster on simple alignment tasks (addition) thanks to bidirectional encoding. But it <strong>fails on scratchpad multiplication</strong> (87.8% vs 100%) &mdash; the cross-attention bottleneck forces the decoder to compress all equation information through attention to encoder states, limiting sequential reasoning over intermediate steps.</p>
+
+<h3>Pre-Training Speedup</h3>
+
+<table>
+  <thead><tr><th>Strategy</th><th>Mixed-Op Accuracy (50 total epochs)</th></tr></thead>
+  <tbody>
+    <tr class="highlight-row"><td><strong>Pre-train add (10ep) &rarr; fine-tune mixed (40ep)</strong></td><td><strong>92.3%</strong></td></tr>
+    <tr><td>From scratch (50ep)</td><td>81.8%</td></tr>
+  </tbody>
+</table>
+
+<p>Addition pre-training gives <strong>+10.5% accuracy</strong> on mixed operations. The carry mechanics learned during addition transfer directly to subtraction and multiplication. From-scratch training plateaus at ~81% while pre-trained keeps climbing through epoch 40.</p>
+
 <h3>Length Generalization</h3>
 
 <table>
@@ -436,6 +489,11 @@ Output: 8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;
   <p>Scratchpad demonstrates that model depth and sequence-level computation are interchangeable. Instead of adding layers (more computation per token), you can add tokens (more steps in the sequence). For multiplication, this is strictly superior: 100% accuracy with 2 layers + scratchpad vs 94.9% with 4 layers alone.</p>
 </div>
 
+<div class="theme-card">
+  <h4>6. Weight Sharing Mirrors Algorithmic Structure</h4>
+  <p>Looped transformers (1 layer repeated 4 times) achieve 99.2&ndash;99.4% accuracy with 7.8&times; fewer parameters. Carry propagation is inherently iterative &mdash; the same operation repeats at every digit position. Weight tying mirrors this structure, making looped architectures a natural fit for arithmetic. Combined with pre-training on addition, this opens the path to sub-500K parameter arithmetic models.</p>
+</div>
+
 <hr>
 
 <h2>Known Limitations</h2>
@@ -451,19 +509,28 @@ Output: 8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;
 
 <h2>Recommended Implementation</h2>
 
-<div class="callout">
-  <div class="callout-title">Quick-start recipe</div>
-  <p></p>
-</div>
+<h3>Option A: Maximum Accuracy (3.5M params)</h3>
 
 <pre><code>1. Tokenizer: 18 tokens (0-9, +-*=, PAD, EOS, BOS, |)
-2. Model: 2-layer transformer, 4 heads, 384 dim, RMSNorm pre-norm
+2. Model: 2-layer decoder-only, 4 heads, 384 dim, GELU, RMSNorm pre-norm
 3. Data: balanced carry sampling, commutativity augmentation
 4. Format: reversed output for add/sub, reversed + scratchpad for mul
 5. Training: AdamW lr=1e-3, wd=0.5, cosine schedule, batch 256, 50 epochs
-6. Hardware: trains in &lt;10 min per operation on Apple M4</code></pre>
+6. Strategy: pre-train on addition 10ep, then fine-tune mixed
+7. Hardware: trains in &lt;10 min per operation on Apple M4</code></pre>
 
-<p>Total parameter count: ~3.5M. Total training time for all 3 operations: under 1 hour on consumer hardware.</p>
+<p>Total: ~3.5M params. 99.9% add/sub, 100% mul. Under 1 hour total training.</p>
+
+<h3>Option B: Minimum Size (454K params)</h3>
+
+<pre><code>1. Tokenizer: same as above
+2. Model: 1-layer looped 4x, 4 heads, 192 dim, GELU, RMSNorm, input injection
+3. Data: same as above
+4. Format: same as above
+5. Training: same + progressive loss (supervise each loop iteration)
+6. Hardware: trains in &lt;15 min on Apple M4</code></pre>
+
+<p>Total: ~454K params. 99.2% add, 99.4% mul+scratchpad. 7.8&times; smaller than Option A with &lt;1% accuracy loss.</p>
 
 <hr>
 
@@ -474,7 +541,8 @@ Output: 8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;
   <li><strong>Scale multiplication</strong> to 5+ digits with scratchpad</li>
   <li><strong>Tune mixed-model</strong> LR schedule to fix the mul accuracy dip</li>
   <li><strong>Add division</strong> as a separate research goal</li>
-  <li><strong>Implement looped transformers</strong> (2 layers &times; N loops) for parameter efficiency on longer inputs</li>
+  <li><strong>Fair SwiGLU comparison</strong> with correct FFN dimensions &mdash; its per-param efficiency was notable despite the bug</li>
+  <li><strong>Looped + pre-training combo</strong> &mdash; combine 454K looped model with addition pre-training for potentially the smallest viable mixed-op model</li>
 </ol>
 
 <hr>
@@ -486,8 +554,8 @@ Output: 8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;
 <ul>
   <li><strong>3 parallel research agents</strong> investigated tokenization, architecture, and training simultaneously</li>
   <li><strong>An agent team</strong> (synthesizer + experimenter) consolidated findings and ran experiments</li>
-  <li><strong>Working memory</strong> (markdown wiki) accumulated 27 findings, 15 entities, 5 themes, and 10 open questions</li>
-  <li><strong>8 experiments</strong> were run on Apple M4 with MLX, validating literature claims with real data</li>
+  <li><strong>Working memory</strong> (markdown wiki) accumulated 31 findings, 15 entities, 6 themes, and 10 open questions</li>
+  <li><strong>12 experiments</strong> were run on Apple M4 with MLX, validating literature claims with real data</li>
   <li><strong>GitHub Project</strong> tracked all hypotheses as issues with sub-issue hierarchy</li>
 </ul>
 
