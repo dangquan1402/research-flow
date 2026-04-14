@@ -6,6 +6,8 @@ import numpy as np
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+from loguru import logger
+from tqdm import tqdm
 
 from ..tokenizer import PAD_ID, pad_and_encode, pad_and_encode_with_positions
 from ..data import generate_dataset, generate_ood_dataset
@@ -24,7 +26,7 @@ def count_parameters(model):
 def save_checkpoint(model, path):
     """Save model weights to a checkpoint file."""
     model.save_weights(path)
-    print(f"Checkpoint saved to {path}")
+    logger.info(f"Checkpoint saved to {path}")
 
 
 def load_checkpoint(model, path):
@@ -48,17 +50,17 @@ def load_checkpoint(model, path):
                     [value[:min_len], new_weight[min_len:]], axis=0
                 )
                 filtered.append((key, new_weight))
-                print(f"  Resized {key}: {value.shape} -> {new_weight.shape}")
+                logger.info(f"Resized {key}: {value.shape} -> {new_weight.shape}")
                 continue
             else:
-                print(
-                    f"  Skipping {key}: shape mismatch {value.shape} vs {model_params[key].shape}"
+                logger.warning(
+                    f"Skipping {key}: shape mismatch {value.shape} vs {model_params[key].shape}"
                 )
                 continue
         filtered.append((key, value))
 
     model.load_weights(filtered)
-    print(f"Checkpoint loaded from {path}")
+    logger.info(f"Checkpoint loaded from {path}")
 
 
 def train_mlx(args):
@@ -76,11 +78,11 @@ def train_mlx(args):
     use_scratchpad = args.scratchpad
     use_pc = args.pos_encoding == "position_coupling"
 
-    print(f"Generating {args.train_samples} training examples...")
+    logger.info(f"Generating {args.train_samples} training examples...")
     if use_scratchpad:
-        print("Scratchpad mode enabled for multiplication")
+        logger.info("Scratchpad mode enabled for multiplication")
     if use_pc:
-        print("Position coupling enabled")
+        logger.info("Position coupling enabled")
     train_data = generate_dataset(
         args.op,
         args.max_digits,
@@ -97,7 +99,7 @@ def train_mlx(args):
         balanced,
         use_scratchpad,
     )
-    print(f"Generated {len(train_data)} train, {len(test_data)} test examples")
+    logger.info(f"Generated {len(train_data)} train, {len(test_data)} test examples")
 
     # Determine max sequence length
     max_len = (
@@ -160,7 +162,7 @@ def train_mlx(args):
 
     n_params = count_parameters(model)
     looped_str = f", looped={n_loops}x" if architecture == "looped" else ""
-    print(
+    logger.info(
         f"Model: {args.n_layers}L/{args.n_heads}H/{args.dim}D{looped_str}, {n_params:,} params"
     )
 
@@ -232,13 +234,14 @@ def train_mlx(args):
         "epoch_logs": [],
     }
 
-    print(f"\nTraining for {args.epochs} epochs, batch_size={args.batch_size}")
-    print("-" * 70)
+    logger.info(f"Training for {args.epochs} epochs, batch_size={args.batch_size}")
 
     global_step = 0
+    n_total_batches = len(train_data) // args.batch_size + 1
     start_time = time.time()
 
-    for epoch in range(1, args.epochs + 1):
+    epoch_bar = tqdm(range(1, args.epochs + 1), desc="Epochs", unit="ep")
+    for epoch in epoch_bar:
         epoch_start = time.time()
 
         # Shuffle
@@ -260,7 +263,15 @@ def train_mlx(args):
         epoch_loss = 0.0
         n_batches = 0
 
-        for i in range(0, len(train_data), args.batch_size):
+        batch_iter = range(0, len(train_data), args.batch_size)
+        batch_bar = tqdm(
+            batch_iter,
+            desc=f"Epoch {epoch}",
+            leave=False,
+            unit="batch",
+            total=n_total_batches,
+        )
+        for i in batch_bar:
             batch = train_x_shuffled[i : i + args.batch_size]
             if batch.shape[0] == 0:
                 continue
@@ -278,6 +289,7 @@ def train_mlx(args):
             epoch_loss += loss.item()
             n_batches += 1
             global_step += 1
+            batch_bar.set_postfix(loss=f"{epoch_loss / n_batches:.4f}")
 
         avg_loss = epoch_loss / max(n_batches, 1)
         epoch_time = time.time() - epoch_start
@@ -314,7 +326,8 @@ def train_mlx(args):
             digit_str = "  " + " ".join(
                 f"{k}d:{v:.0%}" for k, v in sorted(digit_accuracy.items())
             )
-        print(
+        epoch_bar.set_postfix_str(f"loss={avg_loss:.4f}{acc_str}")
+        logger.info(
             f"Epoch {epoch:3d} | loss={avg_loss:.4f} | {epoch_time:.1f}s{acc_str}{digit_str}"
         )
 
@@ -323,8 +336,9 @@ def train_mlx(args):
     results["final_accuracy"] = results["epoch_logs"][-1].get("accuracy", 0)
     results["final_loss"] = results["epoch_logs"][-1]["loss"]
 
-    print("-" * 70)
-    print(f"Done in {total_time:.1f}s. Final accuracy: {results['final_accuracy']:.2%}")
+    logger.success(
+        f"Done in {total_time:.1f}s. Final accuracy: {results['final_accuracy']:.2%}"
+    )
 
     # Save checkpoint if specified
     if args.save_checkpoint:
@@ -332,13 +346,11 @@ def train_mlx(args):
 
     # OOD evaluation
     if eval_max_digits > args.max_digits:
-        print(f"\n{'=' * 70}")
-        print(
+        logger.info(
             f"OOD Length Generalization Evaluation (train max_digits={args.max_digits})"
         )
-        print(f"{'=' * 70}")
         ood_results = {}
-        for nd in range(1, eval_max_digits + 1):
+        for nd in tqdm(range(1, eval_max_digits + 1), desc="OOD eval", unit="digits"):
             ood_data = generate_ood_dataset(args.op, nd, 500, reverse)
             ood_inputs = [inp for inp, _, _ in ood_data]
             ood_answers = [ans for _, _, ans in ood_data]
@@ -354,7 +366,7 @@ def train_mlx(args):
             )
             ood_results[nd] = round(acc, 4)
             in_dist = "ID" if nd <= args.max_digits else "OOD"
-            print(f"  {nd:2d}-digit ({in_dist}): {acc:.2%}")
+            logger.info(f"  {nd:2d}-digit ({in_dist}): {acc:.2%}")
         results["ood_accuracy"] = ood_results
 
     # Save results
@@ -365,6 +377,6 @@ def train_mlx(args):
     out_path = os.path.join(args.output_dir, fname)
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\nResults saved to {out_path}")
+    logger.info(f"Results saved to {out_path}")
 
     return results

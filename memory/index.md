@@ -68,6 +68,8 @@
 - [Looped 192D Addition](findings/experiment-looped-192D-addition.md) — 1Lx4/192D achieves 99.2% on 5-digit add with 454K params (87% fewer than baseline) | high | 2026-04-14
 - [Looped 128D Addition](findings/experiment-looped-128D-addition.md) — 1Lx4/128D only 37.7% — capacity floor, 128D insufficient for looped arch | high | 2026-04-14
 - [Looped Mul+Scratchpad](findings/experiment-looped-mul-scratchpad.md) — 1Lx4/192D achieves 99.4% on 3-digit mul+scratchpad with 456K params | high | 2026-04-14
+- [SwiGLU Fair Comparison](findings/experiment-swiglu-fair-comparison.md) — SwiGLU hits 100% 5 epochs faster than GELU at identical 3.56M params | high | 2026-04-14
+- [Looped Pre-train Mixed (Negative)](findings/experiment-looped-pretrain-mixed.md) — 454K looped model fails mixed-op target (28.25%); mixed ops need more capacity | high | 2026-04-14
 
 ## Open Questions
 
