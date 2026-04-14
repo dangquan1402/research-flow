@@ -1,5 +1,36 @@
 {
   "_description": "Canonical entity registry. Prevents duplicate pages with different names. Check before creating any entity.",
   "_format": "{ canonical_name: { aliases: [], file: 'entities/slug.md', type: 'person|org|concept|tool|paper' } }",
-  "entities": {}
+  "entities": {
+    "Teaching Arithmetic to Small Transformers": {
+      "aliases": ["Lee 2023", "teaching-arithmetic-paper"],
+      "file": "entities/teaching-arithmetic-small-transformers.md",
+      "type": "paper"
+    },
+    "Understanding Addition and Subtraction in Transformers": {
+      "aliases": ["Nikankin 2024", "understanding-addition-paper"],
+      "file": "entities/understanding-addition-transformers.md",
+      "type": "paper"
+    },
+    "Transformers Can Do Arithmetic with the Right Embeddings": {
+      "aliases": ["McLeish 2024", "abacus-embeddings-paper", "right-embeddings-paper"],
+      "file": "entities/transformers-arithmetic-right-embeddings.md",
+      "type": "paper"
+    },
+    "Position Coupling": {
+      "aliases": ["Cho 2024", "position-coupling-paper"],
+      "file": "entities/position-coupling-paper.md",
+      "type": "paper"
+    },
+    "The Depth Delusion": {
+      "aliases": ["depth-delusion-2026"],
+      "file": "entities/depth-delusion-paper.md",
+      "type": "paper"
+    },
+    "Andrej Karpathy": {
+      "aliases": ["karpathy"],
+      "file": "entities/andrej-karpathy.md",
+      "type": "person"
+    }
+  }
 }
