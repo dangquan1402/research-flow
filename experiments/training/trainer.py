@@ -28,8 +28,36 @@ def save_checkpoint(model, path):
 
 
 def load_checkpoint(model, path):
-    """Load model weights from a checkpoint file."""
-    model.load_weights(path)
+    """Load model weights from a checkpoint file.
+
+    Handles shape mismatches for positional embeddings by copying the
+    overlapping portion when the new model has a different sequence length.
+    """
+    weights = list(mx.load(path).items())
+
+    # Check for pos_emb shape mismatch and handle it
+    model_params = dict(nn.utils.tree_flatten(model.parameters()))
+    filtered = []
+    for key, value in weights:
+        if key in model_params and model_params[key].shape != value.shape:
+            if "pos_emb" in key:
+                # Copy overlapping positions, keep new model's init for the rest
+                min_len = min(model_params[key].shape[0], value.shape[0])
+                new_weight = model_params[key]
+                new_weight = mx.concatenate(
+                    [value[:min_len], new_weight[min_len:]], axis=0
+                )
+                filtered.append((key, new_weight))
+                print(f"  Resized {key}: {value.shape} -> {new_weight.shape}")
+                continue
+            else:
+                print(
+                    f"  Skipping {key}: shape mismatch {value.shape} vs {model_params[key].shape}"
+                )
+                continue
+        filtered.append((key, value))
+
+    model.load_weights(filtered)
     print(f"Checkpoint loaded from {path}")
 
 
@@ -83,13 +111,7 @@ def train_mlx(args):
     if eval_max_digits > args.max_digits:
         # Max seq: BOS + digits + op + digits + = + (digits+1) + EOS
         ood_max_len = (
-            2
-            + eval_max_digits
-            + 1
-            + eval_max_digits
-            + 1
-            + (eval_max_digits + 1)
-            + 2
+            2 + eval_max_digits + 1 + eval_max_digits + 1 + (eval_max_digits + 1) + 2
         )
         max_len = max(max_len, ood_max_len)
 
@@ -302,9 +324,7 @@ def train_mlx(args):
     results["final_loss"] = results["epoch_logs"][-1]["loss"]
 
     print("-" * 70)
-    print(
-        f"Done in {total_time:.1f}s. Final accuracy: {results['final_accuracy']:.2%}"
-    )
+    print(f"Done in {total_time:.1f}s. Final accuracy: {results['final_accuracy']:.2%}")
 
     # Save checkpoint if specified
     if args.save_checkpoint:

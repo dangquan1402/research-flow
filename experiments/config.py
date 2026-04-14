@@ -7,7 +7,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train arithmetic transformer")
     # Task
     parser.add_argument(
-        "--op", choices=["add", "sub", "mul"], default="add", help="Operation"
+        "--op", choices=["add", "sub", "mul", "mixed"], default="add", help="Operation"
     )
     parser.add_argument("--max_digits", type=int, default=5, help="Max operand digits")
     parser.add_argument(
@@ -85,10 +85,16 @@ def parse_args():
 
     # Checkpointing
     parser.add_argument(
-        "--save_checkpoint", type=str, default=None, help="Path to save model checkpoint"
+        "--save_checkpoint",
+        type=str,
+        default=None,
+        help="Path to save model checkpoint",
     )
     parser.add_argument(
-        "--load_checkpoint", type=str, default=None, help="Path to load model checkpoint"
+        "--load_checkpoint",
+        type=str,
+        default=None,
+        help="Path to load model checkpoint",
     )
 
     # Output

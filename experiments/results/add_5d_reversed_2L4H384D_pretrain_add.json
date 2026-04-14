@@ -1,0 +1,99 @@
+{
+  "framework": "mlx",
+  "op": "add",
+  "max_digits": 5,
+  "pos_encoding": "learned",
+  "tokenizer": "reversed",
+  "balanced_carry": true,
+  "scratchpad": false,
+  "max_seq_len": 20,
+  "architecture": "decoder_only",
+  "n_layers": 2,
+  "n_heads": 4,
+  "dim": 384,
+  "ff_dim": 1536,
+  "activation": "gelu",
+  "looped": false,
+  "n_loops": null,
+  "n_params": 3562368,
+  "train_samples": 50000,
+  "test_samples": 2000,
+  "epochs": 10,
+  "batch_size": 256,
+  "lr": 0.001,
+  "weight_decay": 0.5,
+  "seed": 42,
+  "epoch_logs": [
+    {
+      "epoch": 1,
+      "loss": 2.0193,
+      "time_s": 29.92
+    },
+    {
+      "epoch": 2,
+      "loss": 1.8037,
+      "time_s": 36.84
+    },
+    {
+      "epoch": 3,
+      "loss": 1.7773,
+      "time_s": 38.16
+    },
+    {
+      "epoch": 4,
+      "loss": 1.7264,
+      "time_s": 32.33
+    },
+    {
+      "epoch": 5,
+      "loss": 1.5517,
+      "time_s": 24.79,
+      "accuracy": 0.4035,
+      "digit_accuracy": {
+        "1": 0.23529411764705882,
+        "2": 0.7115384615384616,
+        "3": 0.6743295019157088,
+        "4": 0.4476744186046512,
+        "5": 0.2853628536285363,
+        "6": 0.22362869198312235
+      }
+    },
+    {
+      "epoch": 6,
+      "loss": 1.3847,
+      "time_s": 12.86
+    },
+    {
+      "epoch": 7,
+      "loss": 1.3282,
+      "time_s": 9.1
+    },
+    {
+      "epoch": 8,
+      "loss": 1.3108,
+      "time_s": 8.58
+    },
+    {
+      "epoch": 9,
+      "loss": 1.3079,
+      "time_s": 8.14
+    },
+    {
+      "epoch": 10,
+      "loss": 1.3063,
+      "time_s": 8.13,
+      "accuracy": 1.0,
+      "digit_accuracy": {
+        "1": 1.0,
+        "2": 1.0,
+        "3": 1.0,
+        "4": 1.0,
+        "5": 1.0,
+        "6": 1.0
+      }
+    }
+  ],
+  "total_time_s": 248.91,
+  "final_accuracy": 1.0,
+  "final_loss": 1.3063
+}

@@ -18,6 +18,9 @@ def generate_example(
 
     Returns (input_str, full_sequence, answer_int).
     """
+    if op == "mixed":
+        op = random.choice(["add", "sub", "mul"])
+
     if balanced_carry and op in ("add", "sub"):
         a, b = sample_balanced_carry(max_digits)
     else:

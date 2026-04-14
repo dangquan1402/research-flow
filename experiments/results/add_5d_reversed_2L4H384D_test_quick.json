@@ -1,0 +1,45 @@
+{
+  "framework": "mlx",
+  "op": "add",
+  "max_digits": 5,
+  "pos_encoding": "learned",
+  "tokenizer": "reversed",
+  "balanced_carry": true,
+  "scratchpad": false,
+  "max_seq_len": 20,
+  "architecture": "decoder_only",
+  "n_layers": 2,
+  "n_heads": 4,
+  "dim": 384,
+  "ff_dim": 1536,
+  "activation": "gelu",
+  "looped": false,
+  "n_loops": null,
+  "n_params": 3562368,
+  "train_samples": 50000,
+  "test_samples": 2000,
+  "epochs": 1,
+  "batch_size": 256,
+  "lr": 0.001,
+  "weight_decay": 0.5,
+  "seed": 42,
+  "epoch_logs": [
+    {
+      "epoch": 1,
+      "loss": 2.0284,
+      "time_s": 62.67,
+      "accuracy": 0.008,
+      "digit_accuracy": {
+        "1": 0.0,
+        "2": 0.04487179487179487,
+        "3": 0.02681992337164751,
+        "4": 0.003875968992248062,
+        "5": 0.0,
+        "6": 0.0
+      }
+    }
+  ],
+  "total_time_s": 128.82,
+  "final_accuracy": 0.008,
+  "final_loss": 2.0284
+}
