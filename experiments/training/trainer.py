@@ -331,6 +331,23 @@ def train_mlx(args):
             f"Epoch {epoch:3d} | loss={avg_loss:.4f} | {epoch_time:.1f}s{acc_str}{digit_str}"
         )
 
+        # Incremental save after each eval epoch (crash-safe)
+        if accuracy is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
+            tag = f"_{args.tag}" if args.tag else ""
+            pos_tag = f"_{args.pos_encoding}" if args.pos_encoding != "learned" else ""
+            partial_fname = f"{args.op}_{args.max_digits}d_{args.tokenizer}_{args.n_layers}L{args.n_heads}H{args.dim}D{pos_tag}{tag}.partial.json"
+            partial_path = os.path.join(args.output_dir, partial_fname)
+            partial_results = dict(results)
+            partial_results["total_time_s"] = round(time.time() - start_time, 2)
+            partial_results["final_accuracy"] = accuracy
+            partial_results["final_loss"] = avg_loss
+            partial_results["status"] = "in_progress"
+            partial_results["completed_epochs"] = epoch
+            with open(partial_path, "w") as f:
+                json.dump(partial_results, f, indent=2)
+            logger.debug(f"Partial results saved to {partial_path}")
+
     total_time = time.time() - start_time
     results["total_time_s"] = round(total_time, 2)
     results["final_accuracy"] = results["epoch_logs"][-1].get("accuracy", 0)
@@ -369,14 +386,22 @@ def train_mlx(args):
             logger.info(f"  {nd:2d}-digit ({in_dist}): {acc:.2%}")
         results["ood_accuracy"] = ood_results
 
-    # Save results
+    # Save final results
     os.makedirs(args.output_dir, exist_ok=True)
     tag = f"_{args.tag}" if args.tag else ""
     pos_tag = f"_{args.pos_encoding}" if args.pos_encoding != "learned" else ""
     fname = f"{args.op}_{args.max_digits}d_{args.tokenizer}_{args.n_layers}L{args.n_heads}H{args.dim}D{pos_tag}{tag}.json"
     out_path = os.path.join(args.output_dir, fname)
+    results["status"] = "complete"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
     logger.info(f"Results saved to {out_path}")
+
+    # Clean up partial results file
+    partial_fname = fname.replace(".json", ".partial.json")
+    partial_path = os.path.join(args.output_dir, partial_fname)
+    if os.path.exists(partial_path):
+        os.remove(partial_path)
+        logger.debug(f"Cleaned up {partial_path}")
 
     return results
