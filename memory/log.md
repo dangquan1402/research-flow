@@ -151,3 +151,14 @@
 - Created finding: experiment-mixed-operations.md
 - Created results: mixed_ops_results.md
 - Agent: mixed-ops
+
+## [2026-04-14] create | experiment-looped-pretrain-mixed
+
+- **Negative result:** Looped 1Lx4/192D (463K params) fails mixed-op target with pre-training
+- Pre-trained on addition (10 epochs, 13.6% — still learning)
+- Fine-tuned on mixed add+sub+mul (40 epochs, 28.25% final accuracy)
+- Same architecture achieves 99.2% add and 99.4% mul individually
+- Comparison: 2L/384D (3.58M params) achieves 92.3% with pre-training
+- Conclusion: mixed ops require more capacity than single ops; weight-shared looped block can't multiplex add/sub/mul algorithms
+- Also added loguru + tqdm to trainer for better progress visibility
+- Agent: looped-pretrain
