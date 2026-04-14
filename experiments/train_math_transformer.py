@@ -8,6 +8,7 @@ Implements findings from research:
 - Balanced carry sampling for training data
 - Pre-norm (RMSNorm) architecture
 - AdamW with cosine LR schedule
+- Position Coupling (Cho 2024) for length generalization
 
 Supports MLX (Apple Silicon) with PyTorch MPS fallback.
 
@@ -15,6 +16,7 @@ Usage:
     python experiments/train_math_transformer.py --op add --max_digits 5
     python experiments/train_math_transformer.py --op mul --max_digits 3 --n_layers 4
     python experiments/train_math_transformer.py --op add --max_digits 5 --tokenizer plain  # no reversal
+    python experiments/train_math_transformer.py --op add --max_digits 5 --pos_encoding position_coupling
 """
 
 import argparse
@@ -74,6 +76,92 @@ def encode(s: str) -> list[int]:
 
 def decode(ids: list[int]) -> str:
     return "".join(ID2TOK[i] for i in ids if i not in (PAD_ID, EOS_ID, BOS_ID))
+
+
+# ── Position Coupling ────────────────────────────────────────────────────────
+
+# Position IDs for special tokens (low values, distinct from digit positions)
+PC_BOS_POS = 0
+PC_OP_POS = 1
+PC_EQ_POS = 2
+PC_EOS_POS = 3
+PC_DIGIT_BASE = 4  # Digit significance s → position ID PC_DIGIT_BASE + s
+PC_MAX_POS = 256  # Embedding table size for position coupling
+
+
+def compute_position_coupling_ids(seq_str, training=True):
+    """Compute position IDs for position coupling encoding.
+
+    Digits of equal significance across operands and result share the same
+    position ID, so the model learns to align by significance regardless of
+    operand length.
+
+    For addition with reversed output (e.g., "123+456=975"):
+    - Operand digits are MSB-first: index i in k-digit number → significance k-1-i
+    - Result digits are LSB-first (reversed): index j → significance j
+    - Special tokens (<bos>, +, =, <eos>) get unique position IDs
+
+    During training, a random offset in [1, 100] is added to all position IDs
+    so the model cannot memorize absolute positions.
+    """
+    op_idx = next(i for i, c in enumerate(seq_str) if c in "+-*")
+    eq_idx = seq_str.index("=")
+
+    op1 = seq_str[:op_idx]
+    op2 = seq_str[op_idx + 1 : eq_idx]
+    result = seq_str[eq_idx + 1 :]
+
+    pos_ids = [PC_BOS_POS]
+
+    # Op1 (MSB-first): digit at index i → significance (len-1-i)
+    for i in range(len(op1)):
+        pos_ids.append(PC_DIGIT_BASE + len(op1) - 1 - i)
+
+    pos_ids.append(PC_OP_POS)
+
+    # Op2 (MSB-first)
+    for i in range(len(op2)):
+        pos_ids.append(PC_DIGIT_BASE + len(op2) - 1 - i)
+
+    pos_ids.append(PC_EQ_POS)
+
+    # Result (LSB-first / reversed): digit at index j → significance j
+    for j in range(len(result)):
+        pos_ids.append(PC_DIGIT_BASE + j)
+
+    pos_ids.append(PC_EOS_POS)
+
+    if training:
+        offset = random.randint(1, 100)
+        pos_ids = [p + offset for p in pos_ids]
+
+    return pos_ids
+
+
+def compute_input_position_ids(inp_str):
+    """Compute position IDs for input-only string (for autoregressive eval).
+
+    inp_str looks like "123+456=" (includes trailing =).
+    Returns position IDs including BOS at the start.
+    """
+    op_idx = next(i for i, c in enumerate(inp_str) if c in "+-*")
+    # eq_idx is the last char
+    op1 = inp_str[:op_idx]
+    op2 = inp_str[op_idx + 1 : -1]  # exclude trailing '='
+
+    pos_ids = [PC_BOS_POS]
+
+    for i in range(len(op1)):
+        pos_ids.append(PC_DIGIT_BASE + len(op1) - 1 - i)
+
+    pos_ids.append(PC_OP_POS)
+
+    for i in range(len(op2)):
+        pos_ids.append(PC_DIGIT_BASE + len(op2) - 1 - i)
+
+    pos_ids.append(PC_EQ_POS)
+
+    return pos_ids
 
 
 # ── Data Generation ──────────────────────────────────────────────────────────
@@ -198,6 +286,35 @@ def generate_example(
     return input_part, seq, result
 
 
+def generate_example_exact_digits(
+    op: str, n_digits: int, reverse_output: bool = True
+) -> tuple[str, str, int]:
+    """Generate one example where both operands have exactly n_digits digits."""
+    lo = 10 ** (n_digits - 1) if n_digits > 1 else 0
+    hi = 10**n_digits - 1
+    a = random.randint(lo, hi)
+    b = random.randint(lo, hi)
+
+    if op == "add":
+        result = a + b
+    elif op == "sub":
+        if a < b:
+            a, b = b, a
+        result = a - b
+    elif op == "mul":
+        result = a * b
+    else:
+        raise ValueError(f"Unknown op: {op}")
+
+    op_sym = OP_MAP[op]
+    result_str = str(result)
+    if reverse_output:
+        result_str = result_str[::-1]
+    seq = f"{a}{op_sym}{b}={result_str}"
+    input_part = f"{a}{op_sym}{b}="
+    return input_part, seq, result
+
+
 def generate_dataset(
     op: str,
     max_digits: int,
@@ -221,6 +338,22 @@ def generate_dataset(
     return data
 
 
+def generate_ood_dataset(
+    op: str, n_digits: int, n_samples: int, reverse_output: bool = True
+) -> list[tuple[str, str, int]]:
+    """Generate OOD test examples with exactly n_digits per operand."""
+    seen = set()
+    data = []
+    attempts = 0
+    while len(data) < n_samples and attempts < n_samples * 10:
+        attempts += 1
+        inp, seq, ans = generate_example_exact_digits(op, n_digits, reverse_output)
+        if seq not in seen:
+            seen.add(seq)
+            data.append((inp, seq, ans))
+    return data
+
+
 def pad_and_encode(sequences: list[str], max_len: int) -> list[list[int]]:
     """Encode and pad sequences to max_len."""
     result = []
@@ -230,6 +363,28 @@ def pad_and_encode(sequences: list[str], max_len: int) -> list[list[int]]:
         ids += [PAD_ID] * (max_len - len(ids))
         result.append(ids)
     return result
+
+
+def pad_and_encode_with_positions(
+    sequences: list[str], max_len: int, training: bool = True
+) -> tuple[list[list[int]], list[list[int]]]:
+    """Encode sequences and compute position coupling IDs, padded to max_len."""
+    encoded = []
+    positions = []
+    for seq in sequences:
+        ids = [BOS_ID] + encode(seq) + [EOS_ID]
+        pos = compute_position_coupling_ids(seq, training=training)
+
+        ids = ids[:max_len]
+        pos = pos[:max_len]
+
+        ids += [PAD_ID] * (max_len - len(ids))
+        pos += [0] * (max_len - len(pos))
+
+        encoded.append(ids)
+        positions.append(pos)
+
+    return encoded, positions
 
 
 # ── MLX Model ────────────────────────────────────────────────────────────────
@@ -308,21 +463,34 @@ if FRAMEWORK == "mlx":
 
     class ArithmeticTransformer(nn.Module):
         def __init__(
-            self, n_layers: int, dim: int, n_heads: int, ff_dim: int, max_seq_len: int
+            self,
+            n_layers: int,
+            dim: int,
+            n_heads: int,
+            ff_dim: int,
+            max_seq_len: int,
+            pos_encoding: str = "learned",
         ):
             super().__init__()
             self.tok_emb = nn.Embedding(VOCAB_SIZE, dim)
-            self.pos_emb = nn.Embedding(max_seq_len, dim)
+            pos_emb_size = (
+                PC_MAX_POS if pos_encoding == "position_coupling" else max_seq_len
+            )
+            self.pos_emb = nn.Embedding(pos_emb_size, dim)
             self.layers = [
                 TransformerBlock(dim, n_heads, ff_dim) for _ in range(n_layers)
             ]
             self.norm = RMSNorm(dim)
             self.output = nn.Linear(dim, VOCAB_SIZE, bias=False)
             self.max_seq_len = max_seq_len
+            self.pos_encoding = pos_encoding
 
-        def __call__(self, x):
+        def __call__(self, x, position_ids=None):
             B, T = x.shape
-            positions = mx.arange(T)
+            if position_ids is not None:
+                positions = position_ids
+            else:
+                positions = mx.arange(T)
             h = self.tok_emb(x) + self.pos_emb(positions)
 
             # Causal mask
@@ -350,10 +518,13 @@ if FRAMEWORK == "mlx":
         reverse = args.tokenizer == "reversed"
         balanced = args.balanced_carry
         use_scratchpad = args.scratchpad
+        use_pc = args.pos_encoding == "position_coupling"
 
         print(f"Generating {args.train_samples} training examples...")
         if use_scratchpad:
             print("Scratchpad mode enabled for multiplication")
+        if use_pc:
+            print("Position coupling enabled")
         train_data = generate_dataset(
             args.op,
             args.max_digits,
@@ -379,8 +550,28 @@ if FRAMEWORK == "mlx":
         seq_cap = 128 if use_scratchpad else 64
         max_len = min(max_len, seq_cap)
 
-        # Encode
-        train_seqs = pad_and_encode([seq for _, seq, _ in train_data], max_len)
+        # For OOD eval, we need a larger max_len
+        eval_max_digits = args.eval_max_digits or args.max_digits
+        if eval_max_digits > args.max_digits:
+            # Max seq: BOS + digits + op + digits + = + (digits+1) + EOS
+            ood_max_len = (
+                2
+                + eval_max_digits
+                + 1
+                + eval_max_digits
+                + 1
+                + (eval_max_digits + 1)
+                + 2
+            )
+            max_len = max(max_len, ood_max_len)
+
+        # Encode tokens (position IDs are recomputed each epoch for fresh random offsets)
+        if use_pc:
+            train_seqs, _ = pad_and_encode_with_positions(
+                [seq for _, seq, _ in train_data], max_len, training=True
+            )
+        else:
+            train_seqs = pad_and_encode([seq for _, seq, _ in train_data], max_len)
         test_inputs = [inp for inp, _, _ in test_data]
         test_answers = [ans for _, _, ans in test_data]
 
@@ -393,6 +584,7 @@ if FRAMEWORK == "mlx":
             n_heads=args.n_heads,
             ff_dim=args.ff_dim,
             max_seq_len=max_len,
+            pos_encoding=args.pos_encoding,
         )
         mx.eval(model.parameters())
         n_params = count_parameters(model)
@@ -417,8 +609,10 @@ if FRAMEWORK == "mlx":
         )
 
         # Loss function
-        def loss_fn(model, x):
-            logits = model(x[:, :-1])  # predict next token
+        def loss_fn(model, x, pos=None):
+            logits = model(
+                x[:, :-1], position_ids=pos[:, :-1] if pos is not None else None
+            )
             targets = x[:, 1:]
             # Mask out padding
             mask = (targets != PAD_ID).astype(mx.float32)
@@ -432,6 +626,7 @@ if FRAMEWORK == "mlx":
             "framework": "mlx",
             "op": args.op,
             "max_digits": args.max_digits,
+            "pos_encoding": args.pos_encoding,
             "tokenizer": args.tokenizer,
             "balanced_carry": args.balanced_carry,
             "scratchpad": use_scratchpad,
@@ -464,6 +659,18 @@ if FRAMEWORK == "mlx":
             perm = np.random.permutation(len(train_data))
             train_x_shuffled = train_x[mx.array(perm)]
 
+            # For position coupling, re-compute position IDs each epoch
+            # (different random offsets per epoch)
+            if use_pc:
+                _, new_pos = pad_and_encode_with_positions(
+                    [seq for _, seq, _ in train_data], max_len, training=True
+                )
+                train_p_shuffled = mx.array(np.array(new_pos, dtype=np.int32))[
+                    mx.array(perm)
+                ]
+            else:
+                train_p_shuffled = None
+
             epoch_loss = 0.0
             n_batches = 0
 
@@ -472,7 +679,13 @@ if FRAMEWORK == "mlx":
                 if batch.shape[0] == 0:
                     continue
 
-                loss, grads = loss_and_grad(model, batch)
+                batch_pos = (
+                    train_p_shuffled[i : i + args.batch_size]
+                    if train_p_shuffled is not None
+                    else None
+                )
+
+                loss, grads = loss_and_grad(model, batch, batch_pos)
                 optimizer.update(model, grads)
                 mx.eval(model.parameters(), optimizer.state)
 
@@ -495,6 +708,7 @@ if FRAMEWORK == "mlx":
                     reverse,
                     args.op,
                     use_scratchpad,
+                    pos_encoding=args.pos_encoding,
                 )
 
             log = {
@@ -528,37 +742,90 @@ if FRAMEWORK == "mlx":
             f"Done in {total_time:.1f}s. Final accuracy: {results['final_accuracy']:.2%}"
         )
 
+        # OOD evaluation
+        if eval_max_digits > args.max_digits:
+            print(f"\n{'=' * 70}")
+            print(
+                f"OOD Length Generalization Evaluation (train max_digits={args.max_digits})"
+            )
+            print(f"{'=' * 70}")
+            ood_results = {}
+            for nd in range(1, eval_max_digits + 1):
+                ood_data = generate_ood_dataset(args.op, nd, 500, reverse)
+                ood_inputs = [inp for inp, _, _ in ood_data]
+                ood_answers = [ans for _, _, ans in ood_data]
+                acc, _ = evaluate_mlx(
+                    model,
+                    ood_inputs,
+                    ood_answers,
+                    max_len,
+                    reverse,
+                    args.op,
+                    False,
+                    pos_encoding=args.pos_encoding,
+                )
+                ood_results[nd] = round(acc, 4)
+                in_dist = "ID" if nd <= args.max_digits else "OOD"
+                print(f"  {nd:2d}-digit ({in_dist}): {acc:.2%}")
+            results["ood_accuracy"] = ood_results
+
         return results
 
     def evaluate_mlx(
-        model, test_inputs, test_answers, max_len, reverse, op, scratchpad=False
+        model,
+        test_inputs,
+        test_answers,
+        max_len,
+        reverse,
+        op,
+        scratchpad=False,
+        pos_encoding="learned",
     ):
         """Evaluate model accuracy via greedy autoregressive decoding."""
         correct = 0
         total = 0
         digit_correct = {}
         digit_total = {}
+        use_pc = pos_encoding == "position_coupling"
 
         for inp_str, true_answer in zip(test_inputs, test_answers):
             # Encode input
             ids = [BOS_ID] + encode(inp_str)
             ids_arr = mx.array([ids])
 
+            # Position IDs for position coupling
+            if use_pc:
+                input_pos = compute_input_position_ids(inp_str)
+                n_result_tokens = 0
+
             # Autoregressive generation
             for _ in range(max_len - len(ids)):
+                # Build position IDs
+                if use_pc:
+                    cur_pos = input_pos + [
+                        PC_DIGIT_BASE + j for j in range(n_result_tokens)
+                    ]
+                    cur_pos_padded = cur_pos + [0] * (max_len - len(cur_pos))
+                    cur_pos_padded = cur_pos_padded[:max_len]
+                    pos_arr = mx.array([cur_pos_padded])
+                else:
+                    pos_arr = None
+
                 # Pad to generate
                 padded = mx.pad(
                     ids_arr,
                     [(0, 0), (0, max_len - ids_arr.shape[1])],
                     constant_values=PAD_ID,
                 )
-                logits = model(padded)
+                logits = model(padded, position_ids=pos_arr)
                 next_logit = logits[0, ids_arr.shape[1] - 1]
                 next_id = mx.argmax(next_logit).item()
 
                 if next_id == EOS_ID or next_id == PAD_ID:
                     break
                 ids_arr = mx.concatenate([ids_arr, mx.array([[next_id]])], axis=1)
+                if use_pc:
+                    n_result_tokens += 1
 
             # Decode prediction
             pred_ids = ids_arr[0, len([BOS_ID] + encode(inp_str)) :].tolist()
@@ -610,10 +877,15 @@ if FRAMEWORK == "pytorch":
             return x / rms * self.weight
 
     class ArithmeticTransformerPT(torch_nn.Module):
-        def __init__(self, n_layers, dim, n_heads, ff_dim, max_seq_len):
+        def __init__(
+            self, n_layers, dim, n_heads, ff_dim, max_seq_len, pos_encoding="learned"
+        ):
             super().__init__()
             self.tok_emb = torch_nn.Embedding(VOCAB_SIZE, dim)
-            self.pos_emb = torch_nn.Embedding(max_seq_len, dim)
+            pos_emb_size = (
+                PC_MAX_POS if pos_encoding == "position_coupling" else max_seq_len
+            )
+            self.pos_emb = torch_nn.Embedding(pos_emb_size, dim)
 
             self.layers = torch_nn.ModuleList()
             for _ in range(n_layers):
@@ -636,11 +908,15 @@ if FRAMEWORK == "pytorch":
             self.norm = RMSNormPT(dim)
             self.output = torch_nn.Linear(dim, VOCAB_SIZE, bias=False)
             self.max_seq_len = max_seq_len
+            self.pos_encoding = pos_encoding
 
-        def forward(self, x):
+        def forward(self, x, position_ids=None):
             B, T = x.shape
             device = x.device
-            positions = torch.arange(T, device=device)
+            if position_ids is not None:
+                positions = position_ids
+            else:
+                positions = torch.arange(T, device=device)
             h = self.tok_emb(x) + self.pos_emb(positions)
 
             mask = torch.triu(
@@ -670,10 +946,13 @@ if FRAMEWORK == "pytorch":
         reverse = args.tokenizer == "reversed"
         balanced = args.balanced_carry
         use_scratchpad = args.scratchpad
+        use_pc = args.pos_encoding == "position_coupling"
 
         print(f"Generating {args.train_samples} training examples...")
         if use_scratchpad:
             print("Scratchpad mode enabled for multiplication")
+        if use_pc:
+            print("Position coupling enabled")
         train_data = generate_dataset(
             args.op,
             args.max_digits,
@@ -696,7 +975,27 @@ if FRAMEWORK == "pytorch":
         seq_cap = 128 if use_scratchpad else 64
         max_len = min(max_len, seq_cap)
 
-        train_seqs = pad_and_encode([seq for _, seq, _ in train_data], max_len)
+        # For OOD eval, we need a larger max_len
+        eval_max_digits = args.eval_max_digits or args.max_digits
+        if eval_max_digits > args.max_digits:
+            ood_max_len = (
+                2
+                + eval_max_digits
+                + 1
+                + eval_max_digits
+                + 1
+                + (eval_max_digits + 1)
+                + 2
+            )
+            max_len = max(max_len, ood_max_len)
+
+        # Encode tokens (position IDs are recomputed each epoch for fresh random offsets)
+        if use_pc:
+            train_seqs, _ = pad_and_encode_with_positions(
+                [seq for _, seq, _ in train_data], max_len, training=True
+            )
+        else:
+            train_seqs = pad_and_encode([seq for _, seq, _ in train_data], max_len)
         test_inputs = [inp for inp, _, _ in test_data]
         test_answers = [ans for _, _, ans in test_data]
 
@@ -708,6 +1007,7 @@ if FRAMEWORK == "pytorch":
             n_heads=args.n_heads,
             ff_dim=args.ff_dim,
             max_seq_len=max_len,
+            pos_encoding=args.pos_encoding,
         ).to(device)
 
         n_params = count_parameters_pt(model)
@@ -732,6 +1032,7 @@ if FRAMEWORK == "pytorch":
             "device": str(device),
             "op": args.op,
             "max_digits": args.max_digits,
+            "pos_encoding": args.pos_encoding,
             "tokenizer": args.tokenizer,
             "balanced_carry": args.balanced_carry,
             "n_layers": args.n_layers,
@@ -761,6 +1062,17 @@ if FRAMEWORK == "pytorch":
             perm = torch.randperm(len(train_data), device=device)
             train_x_shuffled = train_x[perm]
 
+            # Re-compute position IDs each epoch for fresh random offsets
+            if use_pc:
+                _, new_pos = pad_and_encode_with_positions(
+                    [seq for _, seq, _ in train_data], max_len, training=True
+                )
+                train_p_shuffled = torch.tensor(
+                    new_pos, dtype=torch.long, device=device
+                )[perm]
+            else:
+                train_p_shuffled = None
+
             epoch_loss = 0.0
             n_batches = 0
 
@@ -769,7 +1081,16 @@ if FRAMEWORK == "pytorch":
                 if batch.shape[0] == 0:
                     continue
 
-                logits = model(batch[:, :-1])
+                batch_pos = (
+                    train_p_shuffled[i : i + args.batch_size]
+                    if train_p_shuffled is not None
+                    else None
+                )
+
+                logits = model(
+                    batch[:, :-1],
+                    position_ids=(batch_pos[:, :-1] if batch_pos is not None else None),
+                )
                 targets = batch[:, 1:]
                 mask = (targets != PAD_ID).float()
 
@@ -806,6 +1127,7 @@ if FRAMEWORK == "pytorch":
                         args.op,
                         device,
                         use_scratchpad,
+                        pos_encoding=args.pos_encoding,
                     )
 
             log = {
@@ -838,6 +1160,36 @@ if FRAMEWORK == "pytorch":
             f"Done in {total_time:.1f}s. Final accuracy: {results['final_accuracy']:.2%}"
         )
 
+        # OOD evaluation
+        if eval_max_digits > args.max_digits:
+            print(f"\n{'=' * 70}")
+            print(
+                f"OOD Length Generalization Evaluation (train max_digits={args.max_digits})"
+            )
+            print(f"{'=' * 70}")
+            ood_results = {}
+            model.eval()
+            with torch.no_grad():
+                for nd in range(1, eval_max_digits + 1):
+                    ood_data = generate_ood_dataset(args.op, nd, 500, reverse)
+                    ood_inputs = [inp for inp, _, _ in ood_data]
+                    ood_answers = [ans for _, _, ans in ood_data]
+                    acc, _ = evaluate_pytorch(
+                        model,
+                        ood_inputs,
+                        ood_answers,
+                        max_len,
+                        reverse,
+                        args.op,
+                        device,
+                        False,
+                        pos_encoding=args.pos_encoding,
+                    )
+                    ood_results[nd] = round(acc, 4)
+                    in_dist = "ID" if nd <= args.max_digits else "OOD"
+                    print(f"  {nd:2d}-digit ({in_dist}): {acc:.2%}")
+            results["ood_accuracy"] = ood_results
+
         return results
 
     def evaluate_pytorch(
@@ -849,21 +1201,39 @@ if FRAMEWORK == "pytorch":
         op,
         device,
         scratchpad=False,
+        pos_encoding="learned",
     ):
         correct = 0
         total = 0
         digit_correct = {}
         digit_total = {}
+        use_pc = pos_encoding == "position_coupling"
 
         for inp_str, true_answer in zip(test_inputs, test_answers):
             ids = [BOS_ID] + encode(inp_str)
             ids_t = torch.tensor([ids], dtype=torch.long, device=device)
 
+            if use_pc:
+                input_pos = compute_input_position_ids(inp_str)
+                n_result_tokens = 0
+
             for _ in range(max_len - len(ids)):
+                if use_pc:
+                    cur_pos = input_pos + [
+                        PC_DIGIT_BASE + j for j in range(n_result_tokens)
+                    ]
+                    cur_pos_padded = cur_pos + [0] * (max_len - len(cur_pos))
+                    cur_pos_padded = cur_pos_padded[:max_len]
+                    pos_t = torch.tensor(
+                        [cur_pos_padded], dtype=torch.long, device=device
+                    )
+                else:
+                    pos_t = None
+
                 padded = torch.nn.functional.pad(
                     ids_t, (0, max_len - ids_t.shape[1]), value=PAD_ID
                 )
-                logits = model(padded)
+                logits = model(padded, position_ids=pos_t)
                 next_logit = logits[0, ids_t.shape[1] - 1]
                 next_id = torch.argmax(next_logit).item()
 
@@ -872,6 +1242,8 @@ if FRAMEWORK == "pytorch":
                 ids_t = torch.cat(
                     [ids_t, torch.tensor([[next_id]], device=device)], dim=1
                 )
+                if use_pc:
+                    n_result_tokens += 1
 
             pred_ids = ids_t[0, len([BOS_ID] + encode(inp_str)) :].tolist()
             pred_str = decode(pred_ids)
@@ -930,6 +1302,18 @@ def main():
         default=False,
         help="Enable scratchpad (intermediate steps) for multiplication",
     )
+    parser.add_argument(
+        "--pos_encoding",
+        choices=["learned", "position_coupling"],
+        default="learned",
+        help="Positional encoding: learned (standard APE) or position_coupling (Cho 2024)",
+    )
+    parser.add_argument(
+        "--eval_max_digits",
+        type=int,
+        default=None,
+        help="Max digits for OOD evaluation (default: same as max_digits, no OOD eval)",
+    )
 
     # Architecture
     parser.add_argument(
@@ -938,7 +1322,9 @@ def main():
     parser.add_argument(
         "--n_heads", type=int, default=4, help="Number of attention heads"
     )
-    parser.add_argument("--dim", type=int, default=256, help="Embedding dimension")
+    parser.add_argument(
+        "--dim", "--d_model", type=int, default=256, help="Embedding dimension"
+    )
     parser.add_argument("--ff_dim", type=int, default=1024, help="FFN hidden dimension")
 
     # Training
@@ -978,7 +1364,8 @@ def main():
     # Save results
     os.makedirs(args.output_dir, exist_ok=True)
     tag = f"_{args.tag}" if args.tag else ""
-    fname = f"{args.op}_{args.max_digits}d_{args.tokenizer}_{args.n_layers}L{args.n_heads}H{args.dim}D{tag}.json"
+    pos_tag = f"_{args.pos_encoding}" if args.pos_encoding != "learned" else ""
+    fname = f"{args.op}_{args.max_digits}d_{args.tokenizer}_{args.n_layers}L{args.n_heads}H{args.dim}D{pos_tag}{tag}.json"
     out_path = os.path.join(args.output_dir, fname)
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)

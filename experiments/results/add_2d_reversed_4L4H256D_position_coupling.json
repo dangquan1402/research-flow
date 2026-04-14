@@ -1,0 +1,49 @@
+{
+  "framework": "mlx",
+  "op": "add",
+  "max_digits": 2,
+  "pos_encoding": "position_coupling",
+  "tokenizer": "reversed",
+  "balanced_carry": true,
+  "scratchpad": false,
+  "max_seq_len": 19,
+  "n_layers": 4,
+  "n_heads": 4,
+  "dim": 256,
+  "ff_dim": 1024,
+  "n_params": 3222784,
+  "train_samples": 500,
+  "test_samples": 50,
+  "epochs": 2,
+  "batch_size": 64,
+  "lr": 0.001,
+  "weight_decay": 0.5,
+  "seed": 42,
+  "epoch_logs": [
+    {
+      "epoch": 1,
+      "loss": 2.8129,
+      "time_s": 0.52
+    },
+    {
+      "epoch": 2,
+      "loss": 2.2933,
+      "time_s": 0.34,
+      "accuracy": 0.0,
+      "digit_accuracy": {
+        "1": 0.0,
+        "2": 0.0,
+        "3": 0.0
+      }
+    }
+  ],
+  "total_time_s": 1.35,
+  "final_accuracy": 0.0,
+  "final_loss": 2.2933,
+  "ood_accuracy": {
+    "1": 0.02,
+    "2": 0.0,
+    "3": 0.0,
+    "4": 0.0
+  }
+}

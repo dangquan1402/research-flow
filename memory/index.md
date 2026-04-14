@@ -62,6 +62,9 @@
 - [Scratchpad Format Research](findings/scratchpad-format-research.md) — Aligned reversed partial products optimal; minimizes tokens while keeping steps simple | high | 2026-04-14
 - [Scratchpad 4L/256D](findings/experiment-scratchpad-4L256D.md) — Scratchpad pushes 4L/256D mult from 94.9% to 100%; 6-digit: 60%→100% | high | 2026-04-14
 - [Scratchpad 2L/384D](findings/experiment-scratchpad-2L384D.md) — **Key result**: scratchpad makes 2L viable for mult (85%→100%); unified arch | high | 2026-04-14
+- [Length Generalization](findings/experiment-length-generalization.md) — APE: 0% OOD; PC: inconclusive (didn't converge in 50 epochs) | high | 2026-04-14
+- [Position Coupling vs APE](findings/experiment-position-coupling-vs-ape.md) — PC slower to converge, weak OOD signal; needs 200+ epochs | medium | 2026-04-14
+- [Mixed Operations](findings/experiment-mixed-operations.md) — Single 2L/384D model: add 99.1%, sub 99.7%, mul 97.5%; no interference | high | 2026-04-14
 
 ## Open Questions
 

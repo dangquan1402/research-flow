@@ -140,3 +140,14 @@
 - Decision log updated: mult format validated
 - Open question #1 (scratchpad format) marked resolved
 - Agent: scratchpad-engineer
+
+## [2026-04-14] create | experiment-mixed-operations
+
+- Added `--op mixed` mode to training script
+- Generates equal proportions of add, sub, mul with per-op data formatting
+- Trained 2L/4H/384D for 80 epochs on 50k mixed examples
+- Results: add 99.1%, sub 99.7%, mul 97.5% (overall 98.75%)
+- No catastrophic interference between operations
+- Created finding: experiment-mixed-operations.md
+- Created results: mixed_ops_results.md
+- Agent: mixed-ops
