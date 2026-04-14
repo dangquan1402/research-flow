@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building an LLM for Simple Math: Research Report</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --accent: #4361ee;
+    --accent-light: #eef0ff;
+    --border: #e2e4e9;
+    --muted: #6b7280;
+    --code-bg: #f4f5f7;
+    --success: #059669;
+    --warning: #d97706;
+    --table-header: #f8f9fb;
+    --table-stripe: #fafbfc;
+    --highlight: #fef3c7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.7;
+    font-size: 16px;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 2rem 5rem;
+  }
+
+  h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+    color: var(--fg);
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-top: 3rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--accent);
+    color: var(--fg);
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.6rem;
+    color: var(--fg);
+  }
+
+  p { margin-bottom: 1rem; }
+
+  blockquote {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.95rem;
+    color: var(--muted);
+  }
+
+  blockquote a { color: var(--accent); }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.25rem 0 1.5rem;
+    font-size: 0.92rem;
+  }
+
+  thead th {
+    background: var(--table-header);
+    font-weight: 600;
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  tbody td {
+    padding: 0.55rem 0.8rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+  strong { font-weight: 600; }
+
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+
+  pre {
+    background: var(--code-bg);
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    border: 1px solid var(--border);
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ol, ul {
+    margin: 0.5rem 0 1rem 1.5rem;
+  }
+
+  li { margin-bottom: 0.35rem; }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+
+  .badge-pass { background: #d1fae5; color: #065f46; }
+  .badge-partial { background: #fef3c7; color: #92400e; }
+
+  .highlight-row td { background: var(--highlight) !important; }
+
+  .meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+
+  .meta span { display: flex; align-items: center; gap: 0.3rem; }
+
+  .callout {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+
+  .callout-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.3rem;
+    color: #065f46;
+  }
+
+  .callout p { margin-bottom: 0; font-size: 0.95rem; }
+
+  .theme-card {
+    background: var(--accent-light);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .theme-card h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    color: var(--accent);
+  }
+
+  .theme-card p { margin-bottom: 0; font-size: 0.93rem; }
+
+  @media (max-width: 640px) {
+    body { padding: 1.5rem 1rem 3rem; font-size: 15px; }
+    h1 { font-size: 1.7rem; }
+    h2 { font-size: 1.3rem; }
+    table { font-size: 0.83rem; }
+    .meta { flex-direction: column; gap: 0.5rem; }
+  }
+
+  @media print {
+    body { max-width: 100%; padding: 1rem; font-size: 11pt; }
+    h2 { break-after: avoid; }
+    table, pre { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Building an LLM for Simple Math</h1>
+<p style="font-size: 1.15rem; color: var(--muted); margin-bottom: 0.5rem;">Research Report</p>
+
+<div class="meta">
+  <span>Duration: Apr 13&ndash;14, 2026</span>
+  <span>Method: Literature (21 findings, 12+ papers) + 8 experiments</span>
+  <span>Hardware: Apple M4 / MLX</span>
+  <span>Repo: <a href="https://github.com/dangquan1402/research-flow">dangquan1402/research-flow</a></span>
+</div>
+
+<hr>
+
+<h2>Executive Summary</h2>
+
+<p>A <strong>2-layer, 3.5M-parameter transformer</strong> achieves near-perfect accuracy on all three arithmetic operations when paired with the right data formatting. The single most important finding: <strong>how you format the data matters more than how you design the model.</strong> Reversed digit output, digit-level tokenization, and scratchpad for multiplication collectively contribute more to accuracy than doubling model depth or width.</p>
+
+<hr>
+
+<h2>The Architecture</h2>
+
+<h3>Final Recommendation: 2L / 4H / 384D</h3>
+
+<table>
+  <thead><tr><th>Component</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Layers</td><td><strong>2</strong></td></tr>
+    <tr><td>Attention heads</td><td>4</td></tr>
+    <tr><td>Embedding dimension</td><td>384</td></tr>
+    <tr><td>FFN dimension</td><td>1536 (4&times;)</td></tr>
+    <tr><td>Normalization</td><td>RMSNorm (pre-norm)</td></tr>
+    <tr><td>Positional encoding</td><td>Learned absolute</td></tr>
+    <tr><td>Parameters</td><td><strong>~3.5 M</strong></td></tr>
+    <tr><td>Framework</td><td>MLX (Apple Silicon native)</td></tr>
+  </tbody>
+</table>
+
+<p>This single architecture handles all three operations. No operation-specific models needed.</p>
+
+<hr>
+
+<h2>Tokenization Strategy</h2>
+
+<h3>Vocabulary: 18 tokens</h3>
+
+<pre><code>Digits:     0 1 2 3 4 5 6 7 8 9
+Operators:  + - * =
+Special:    &lt;PAD&gt; &lt;EOS&gt; &lt;BOS&gt; |</code></pre>
+
+<h3>Three Non-Negotiable Decisions</h3>
+
+<p><strong>1. Digit-level tokenization</strong> &mdash; Each digit is its own token. Standard BPE destroys arithmetic accuracy (drops to 8.25% on length-mismatched problems) because it creates inconsistent digit boundaries that misalign place values.</p>
+
+<p><strong>2. Reversed (LSB-first) output</strong> &mdash; The answer is emitted least-significant digit first. This aligns autoregressive generation with carry propagation: the model produces the ones digit first (which it can compute immediately), then the tens digit (using the carry from the ones), and so on. Without reversal, the model must &ldquo;predict&rdquo; the most-significant digit first, which depends on carry chains it hasn't computed yet.</p>
+
+<ul>
+  <li>Experimentally validated: +2.05% accuracy, 2&times; faster convergence to 95%</li>
+  <li>Literature: reduces learning complexity from exponential to linear</li>
+</ul>
+
+<p><strong>3. Scratchpad for multiplication only</strong> &mdash; Multiplication requires multi-step partial-product accumulation that a 2-layer model cannot perform in a single forward pass. Externalizing these steps into the token sequence (as a &ldquo;scratchpad&rdquo;) gives the model intermediate computation space.</p>
+
+<p>Format: aligned reversed partial products separated by <code>|</code></p>
+
+<pre><code>Input:  1 2 * 3 4 =
+Output: 8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;
+        ^^^^   ^^^^^   ^^^^^
+        12&times;4   12&times;30   final (408 reversed)</code></pre>
+
+<p>Addition and subtraction do NOT need scratchpad &mdash; reversed output alone is sufficient.</p>
+
+<h3>What This Looks Like</h3>
+
+<table>
+  <thead><tr><th>Operation</th><th>Input</th><th>Output</th><th>Decoded</th></tr></thead>
+  <tbody>
+    <tr><td>Addition</td><td><code>1 2 3 + 4 5 6 =</code></td><td><code>9 7 5 &lt;EOS&gt;</code></td><td>579</td></tr>
+    <tr><td>Subtraction</td><td><code>4 5 6 - 1 2 3 =</code></td><td><code>3 3 3 &lt;EOS&gt;</code></td><td>333</td></tr>
+    <tr><td>Multiplication</td><td><code>1 2 * 3 4 =</code></td><td><code>8 4 | 0 6 3 | 8 0 4 &lt;EOS&gt;</code></td><td>408</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Training Strategy</h2>
+
+<h3>Optimizer &amp; Schedule</h3>
+
+<table>
+  <thead><tr><th>Parameter</th><th>Value</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>Optimizer</td><td>AdamW</td><td>Decoupled weight decay critical for generalization</td></tr>
+    <tr><td>Learning rate</td><td>1e-3</td><td>Standard for small transformers</td></tr>
+    <tr class="highlight-row"><td>Weight decay</td><td><strong>0.5</strong></td><td>10-100&times; higher than NLP default. Drives memorization &rarr; algorithm transition (grokking).</td></tr>
+    <tr><td>Beta2</td><td>0.99</td><td>Slightly higher than default 0.999 for stability</td></tr>
+    <tr><td>Batch size</td><td>256</td><td>Sweet spot for arithmetic</td></tr>
+    <tr><td>Schedule</td><td>Cosine with 100-step warmup</td><td>Standard recipe</td></tr>
+    <tr><td>Epochs</td><td>50&ndash;80</td><td>Convergence within this range for all operations</td></tr>
+  </tbody>
+</table>
+
+<h3>Data Generation</h3>
+
+<p><strong>Balanced carry sampling</strong> is non-negotiable. Uniform random number generation produces a heavily skewed distribution: most addition problems have 0&ndash;1 carries, making long carry chains (e.g., 999+1=1000) extremely rare. Balanced sampling ensures carry chain lengths are uniformly distributed, which is critical for learning the carry algorithm.</p>
+
+<p><strong>Data augmentation</strong> (low cost, high value):</p>
+<ul>
+  <li>Commutativity: include both <code>a+b</code> and <code>b+a</code> (doubles training set for free)</li>
+  <li>Identity operations: 1&ndash;5% of examples are <code>a+0=a</code>, <code>a*1=a</code>, <code>a-0=a</code></li>
+</ul>
+
+<p><strong>No strict curriculum needed.</strong> Mixed difficulty with balanced digit-count sampling (1-digit problems are as common as 5-digit) works as well as progressive difficulty. Data format matters more than curriculum ordering.</p>
+
+<hr>
+
+<h2>Experimental Results</h2>
+
+<p style="color: var(--muted); font-size: 0.9rem;">All experiments run on Apple M4 with MLX 0.31.1.</p>
+
+<h3>Single-Operation Accuracy</h3>
+
+<table>
+  <thead><tr><th>Experiment</th><th>Operation</th><th>Architecture</th><th>Accuracy</th><th>Training Time</th></tr></thead>
+  <tbody>
+    <tr><td>Baseline</td><td>Addition (5-digit)</td><td>2L/384D</td><td><strong>99.9%</strong></td><td>8.6 min</td></tr>
+    <tr><td>Subtraction</td><td>Subtraction (5-digit)</td><td>2L/384D</td><td><strong>99.9%</strong></td><td>7.7 min</td></tr>
+    <tr><td>Mul (no scratchpad)</td><td>Multiplication (3-digit)</td><td>2L/384D</td><td>85.2%</td><td>10.1 min</td></tr>
+    <tr><td>Mul (no scratchpad)</td><td>Multiplication (3-digit)</td><td>4L/256D</td><td>94.9%</td><td>11.1 min</td></tr>
+    <tr class="highlight-row"><td>Mul (scratchpad)</td><td>Multiplication (3-digit)</td><td>2L/384D</td><td><strong>100.0%</strong></td><td>32.8 min</td></tr>
+    <tr class="highlight-row"><td>Mul (scratchpad)</td><td>Multiplication (3-digit)</td><td>4L/256D</td><td><strong>100.0%</strong></td><td>39.0 min</td></tr>
+  </tbody>
+</table>
+
+<h3>Mixed-Operation (Single Model)</h3>
+
+<table>
+  <thead><tr><th>Operation</th><th>Accuracy</th></tr></thead>
+  <tbody>
+    <tr><td>Addition (5-digit)</td><td>99.1%</td></tr>
+    <tr><td>Subtraction (5-digit)</td><td>99.7%</td></tr>
+    <tr><td>Multiplication (3-digit, scratchpad)</td><td>97.5%</td></tr>
+    <tr style="font-weight:600"><td>Overall</td><td>98.8%</td></tr>
+  </tbody>
+</table>
+
+<p>No catastrophic interference between operations. Multiplication hit 98&ndash;99% at multiple checkpoints; the final 97.5% is a cosine LR schedule artifact fixable with early stopping.</p>
+
+<h3>Key Ablations</h3>
+
+<p><strong>Tokenization: reversed vs plain output</strong></p>
+<table>
+  <thead><tr><th>Format</th><th>Accuracy</th><th>Epochs to 95%</th></tr></thead>
+  <tbody>
+    <tr class="highlight-row"><td>Reversed</td><td>99.9%</td><td>15</td></tr>
+    <tr><td>Plain</td><td>97.9%</td><td>30</td></tr>
+  </tbody>
+</table>
+
+<p>Reversed is +2% accuracy and 2&times; faster.</p>
+
+<p><strong>Architecture: depth vs width (addition)</strong></p>
+<table>
+  <thead><tr><th>Config</th><th>Params</th><th>Accuracy</th><th>Epochs to 100%</th></tr></thead>
+  <tbody>
+    <tr class="highlight-row"><td>2L/4H/384D</td><td>3.56M</td><td>99.9%</td><td>20</td></tr>
+    <tr><td>4L/4H/256D</td><td>3.16M</td><td>99.9%</td><td>45</td></tr>
+    <tr><td>8L/4H/128D</td><td>1.58M</td><td>99.95%</td><td>30</td></tr>
+    <tr><td>2L/8H/512D</td><td>6.32M</td><td>99.65%</td><td>35</td></tr>
+  </tbody>
+</table>
+
+<p>All configs exceed 99.5%. The 2L/384D is fastest and most stable. Architecture choice matters far less than data formatting for addition.</p>
+
+<p><strong>Scratchpad: the multiplication unlock</strong></p>
+<table>
+  <thead><tr><th>Config</th><th>Without Scratchpad</th><th>With Scratchpad</th><th>Delta</th></tr></thead>
+  <tbody>
+    <tr><td>2L/384D</td><td>85.2%</td><td><strong>100.0%</strong></td><td>+14.8pp</td></tr>
+    <tr><td>4L/256D</td><td>94.9%</td><td><strong>100.0%</strong></td><td>+5.1pp</td></tr>
+  </tbody>
+</table>
+
+<p>Scratchpad eliminates the depth bottleneck entirely. 2L becomes universal.</p>
+
+<h3>Length Generalization</h3>
+
+<table>
+  <thead><tr><th>Digits</th><th>1&ndash;5 (trained)</th><th>6&ndash;10 (unseen)</th></tr></thead>
+  <tbody>
+    <tr><td>Learned APE</td><td>99.95%</td><td><strong>0.0%</strong></td></tr>
+    <tr><td>Position Coupling</td><td>77% (unconverged)</td><td>4.6% &rarr; 0%</td></tr>
+  </tbody>
+</table>
+
+<p>Learned positional encoding completely fails on unseen lengths. Position Coupling showed a directional signal but didn't converge in 50 epochs &mdash; inconclusive, needs 200+ epochs.</p>
+
+<hr>
+
+<h2>Five Themes</h2>
+
+<div class="theme-card">
+  <h4>1. Data Format Supremacy</h4>
+  <p>The formatting of inputs and outputs is the single highest-leverage decision. The hierarchy: (1)&nbsp;Digit-level tokenization, (2)&nbsp;Reversed output order, (3)&nbsp;Scratchpad for multiplication, (4)&nbsp;Balanced carry sampling, (5)&nbsp;Architecture changes (marginal after the above).</p>
+</div>
+
+<div class="theme-card">
+  <h4>2. Shallow and Wide Beats Deep and Narrow</h4>
+  <p>For arithmetic, 2 layers with 384 embedding dimensions outperforms 4 or 8 layers with smaller dimensions. Width grows value 2.8&times; faster than depth. The exception was multiplication without scratchpad &mdash; but scratchpad eliminates that exception.</p>
+</div>
+
+<div class="theme-card">
+  <h4>3. Regularization Drives Generalization</h4>
+  <p>Weight decay of 0.5 (10&ndash;100&times; higher than typical NLP) is critical. It drives the transition from memorization to algorithm learning (the &ldquo;grokking&rdquo; phenomenon). Without high weight decay, models memorize training examples without learning the underlying algorithm.</p>
+</div>
+
+<div class="theme-card">
+  <h4>4. Training Data Distribution Matters as Much as Volume</h4>
+  <p>Balanced carry sampling ensures the model sees difficult cases (long carry chains) as often as easy cases. Without it, uniform random sampling creates a heavily skewed distribution that leaves the model unable to handle carries reliably.</p>
+</div>
+
+<div class="theme-card">
+  <h4>5. Computation Can Live in the Sequence, Not Just the Model</h4>
+  <p>Scratchpad demonstrates that model depth and sequence-level computation are interchangeable. Instead of adding layers (more computation per token), you can add tokens (more steps in the sequence). For multiplication, this is strictly superior: 100% accuracy with 2 layers + scratchpad vs 94.9% with 4 layers alone.</p>
+</div>
+
+<hr>
+
+<h2>Known Limitations</h2>
+
+<ol>
+  <li><strong>Length generalization is unsolved.</strong> The model trained on 5-digit addition scores 0% on 6-digit. Position Coupling is promising but unvalidated in our setup. This means the model needs to be trained on every digit length it will encounter.</li>
+  <li><strong>Multiplication tested only to 3 digits.</strong> The scratchpad sequence length grows quadratically with operand digits. 5-digit multiplication would produce ~100+ token scratchpads. Feasible but untested.</li>
+  <li><strong>Mixed-model multiplication slightly below 98%.</strong> The cosine LR schedule causes a slight accuracy dip at the end of training. Early stopping or schedule tuning would fix this.</li>
+  <li><strong>No division.</strong> Out of scope for this research. Division introduces remainders and non-terminating decimals that require fundamentally different approaches.</li>
+</ol>
+
+<hr>
+
+<h2>Recommended Implementation</h2>
+
+<div class="callout">
+  <div class="callout-title">Quick-start recipe</div>
+  <p></p>
+</div>
+
+<pre><code>1. Tokenizer: 18 tokens (0-9, +-*=, PAD, EOS, BOS, |)
+2. Model: 2-layer transformer, 4 heads, 384 dim, RMSNorm pre-norm
+3. Data: balanced carry sampling, commutativity augmentation
+4. Format: reversed output for add/sub, reversed + scratchpad for mul
+5. Training: AdamW lr=1e-3, wd=0.5, cosine schedule, batch 256, 50 epochs
+6. Hardware: trains in &lt;10 min per operation on Apple M4</code></pre>
+
+<p>Total parameter count: ~3.5M. Total training time for all 3 operations: under 1 hour on consumer hardware.</p>
+
+<hr>
+
+<h2>What We'd Do Next</h2>
+
+<ol>
+  <li><strong>Validate Position Coupling</strong> with 200+ epoch training for length generalization</li>
+  <li><strong>Scale multiplication</strong> to 5+ digits with scratchpad</li>
+  <li><strong>Tune mixed-model</strong> LR schedule to fix the mul accuracy dip</li>
+  <li><strong>Add division</strong> as a separate research goal</li>
+  <li><strong>Implement looped transformers</strong> (2 layers &times; N loops) for parameter efficiency on longer inputs</li>
+</ol>
+
+<hr>
+
+<h2>Methodology</h2>
+
+<p>This research was conducted using an agentic workflow with persistent working memory:</p>
+
+<ul>
+  <li><strong>3 parallel research agents</strong> investigated tokenization, architecture, and training simultaneously</li>
+  <li><strong>An agent team</strong> (synthesizer + experimenter) consolidated findings and ran experiments</li>
+  <li><strong>Working memory</strong> (markdown wiki) accumulated 27 findings, 15 entities, 5 themes, and 10 open questions</li>
+  <li><strong>8 experiments</strong> were run on Apple M4 with MLX, validating literature claims with real data</li>
+  <li><strong>GitHub Project</strong> tracked all hypotheses as issues with sub-issue hierarchy</li>
+</ul>
+
+<p>The persistent memory allowed later experiments to build on earlier findings &mdash; e.g., the scratchpad experiment was designed based on the multiplication accuracy cliff discovered in the depth-vs-width ablation, which itself was informed by the tokenization research.</p>
+
+<hr>
+
+<p style="text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 3rem;">
+  Generated with <a href="https://github.com/dangquan1402/research-flow">research-flow</a> &mdash; an agentic research system with persistent working memory.
+</p>
+
+</body>
+</html>
