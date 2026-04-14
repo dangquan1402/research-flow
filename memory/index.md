@@ -65,6 +65,9 @@
 - [Length Generalization](findings/experiment-length-generalization.md) — APE: 0% OOD; PC: inconclusive (didn't converge in 50 epochs) | high | 2026-04-14
 - [Position Coupling vs APE](findings/experiment-position-coupling-vs-ape.md) — PC slower to converge, weak OOD signal; needs 200+ epochs | medium | 2026-04-14
 - [Mixed Operations](findings/experiment-mixed-operations.md) — Single 2L/384D model: add 99.1%, sub 99.7%, mul 97.5%; no interference | high | 2026-04-14
+- [Looped 192D Addition](findings/experiment-looped-192D-addition.md) — 1Lx4/192D achieves 99.2% on 5-digit add with 454K params (87% fewer than baseline) | high | 2026-04-14
+- [Looped 128D Addition](findings/experiment-looped-128D-addition.md) — 1Lx4/128D only 37.7% — capacity floor, 128D insufficient for looped arch | high | 2026-04-14
+- [Looped Mul+Scratchpad](findings/experiment-looped-mul-scratchpad.md) — 1Lx4/192D achieves 99.4% on 3-digit mul+scratchpad with 456K params | high | 2026-04-14
 
 ## Open Questions
 

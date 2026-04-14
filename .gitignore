@@ -6,3 +6,4 @@ __pycache__/
 .vscode/
 .idea/
 node_modules/
+__pycache__/
