@@ -162,3 +162,12 @@
 - Conclusion: mixed ops require more capacity than single ops; weight-shared looped block can't multiplex add/sub/mul algorithms
 - Also added loguru + tqdm to trainer for better progress visibility
 - Agent: looped-pretrain
+
+## [2026-04-15] evidence | Full research — all experiment results
+
+- Evidence artifacts generated: 9 (8 charts + 1 master table)
+- Charts: 8 | Tables: 1 (color-coded master summary)
+- Findings backed: reversed-digit-order, depth-vs-width-arithmetic, scratchpad-chain-of-thought, looped-transformers-parameter-efficiency, swiglu-fair-comparison, mixed-operations, length-generalization, multiplication-scaling, + all 22 experiments in master summary
+- Scripts: 8 Python scripts reading directly from experiment JSON data
+- Output: outputs/evidence/index.md (full index)
+- Branch: main

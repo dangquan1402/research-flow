@@ -9,6 +9,18 @@ Three layers (from Karpathy's LLM Wiki pattern):
 2. **Working Memory** (`memory/`) — LLM-maintained markdown pages. Entities, findings, themes, open questions. Updated every cycle.
 3. **Schema** (this file) — conventions, structure, workflows.
 
+Plus a **validation & output layer**:
+4. **Outputs** (`outputs/`) — deliverables, evidence, verification, examples, critiques.
+
+```
+outputs/
+├── evidence/       # Charts, tables, plots backing claims (PNG, HTML, .py scripts)
+├── verification/   # Code that checks claims programmatically (.py scripts, results.json)
+├── examples/       # Worked examples illustrating findings (markdown, .py)
+├── critiques/      # Critical reviews with ratings and gap analysis
+└── *.md            # Final deliverables (reports, specs)
+```
+
 ## Git Flow for Research
 
 | Branch Type | Base | Prefix | Purpose |
@@ -80,7 +92,13 @@ memory/
 2. **Ingest** (`/analyze`) — Feed source → extract entities/findings → update memory → log
 3. **Analyze** (`/analyze`) — Read goal + memory → identify gaps → generate new analysis → update memory
 4. **Synthesize** (`/synthesize`) — Consolidate findings → build themes → resolve contradictions → produce output
-5. **Lint** (`/lint`) — Health-check memory: orphans, contradictions, staleness, missing cross-refs
+5. **Evidence** (`/evidence`) — Generate charts, tables, plots backing key claims → `outputs/evidence/`
+6. **Verify** (`/verify`) — Generate code that checks intermediate & final claims → `outputs/verification/`
+7. **Examples** (`/examples`) — Generate worked examples illustrating findings → `outputs/examples/`
+8. **Critique** (`/critique`) — Adversarial review of results, gap analysis, honest write-up → `outputs/critiques/`
+9. **Lint** (`/lint`) — Health-check memory: orphans, contradictions, staleness, missing cross-refs
+
+Steps 5-8 form the **validation & presentation layer** — they can be run in any order after synthesis, and each strengthens the others (e.g., verification failures inform critique, examples clarify evidence).
 
 ## Quality Patterns
 
