@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Research Flow: Full Lifecycle</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8f9fb;
+    --surface-2: #f0f1f5;
+    --border: #e2e4e9;
+    --fg: #1a1a2e;
+    --fg-muted: #6b7280;
+    --accent: #4f46e5;
+    --accent-light: #4338ca;
+    --accent-bg: rgba(79,70,229,0.08);
+    --green: #059669;
+    --green-bg: rgba(5,150,105,0.08);
+    --amber: #d97706;
+    --amber-bg: rgba(217,119,6,0.08);
+    --red: #dc2626;
+    --red-bg: rgba(220,38,38,0.08);
+    --cyan: #0891b2;
+    --cyan-bg: rgba(8,145,178,0.08);
+    --pink: #db2777;
+    --pink-bg: rgba(219,39,119,0.08);
+    --orange: #ea580c;
+    --orange-bg: rgba(234,88,12,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.65;
+    font-size: 15px;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem 5rem;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 4rem;
+    padding: 3rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    background: linear-gradient(135deg, var(--accent), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.75rem;
+  }
+  .header .subtitle {
+    font-size: 1.15rem;
+    color: var(--fg-muted);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .header .meta {
+    margin-top: 1.5rem;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+  .header .meta span {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: var(--surface);
+    border-radius: 999px;
+    margin: 0.25rem;
+    border: 1px solid var(--border);
+  }
+
+  h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-top: 4rem;
+    margin-bottom: 1.5rem;
+    letter-spacing: -0.02em;
+  }
+  h2 .num {
+    color: var(--accent-light);
+    font-weight: 800;
+    margin-right: 0.5rem;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  p { margin-bottom: 1rem; }
+
+  /* Section cards */
+  .section-intro {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    font-size: 0.95rem;
+    color: var(--fg-muted);
+  }
+
+  /* Flow diagram */
+  .flow-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+    margin: 2rem 0;
+    overflow-x: auto;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 1rem 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .flow-node {
+    flex: 0 0 auto;
+    min-width: 140px;
+    max-width: 180px;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    position: relative;
+    border: 2px solid;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .flow-node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .flow-node .label { font-size: 0.7rem; font-weight: 500; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem; }
+  .flow-node .skill { font-size: 0.7rem; font-weight: 400; opacity: 0.5; margin-top: 0.35rem; font-family: monospace; }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    flex-shrink: 0;
+    color: var(--fg-muted);
+    font-size: 1.2rem;
+  }
+  .flow-arrow-down {
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0;
+    color: var(--fg-muted);
+    font-size: 1.4rem;
+  }
+
+  .node-init { background: var(--accent-bg); border-color: var(--accent); color: var(--accent-light); }
+  .node-ingest { background: var(--cyan-bg); border-color: var(--cyan); color: var(--cyan); }
+  .node-analyze { background: var(--cyan-bg); border-color: var(--cyan); color: var(--cyan); }
+  .node-experiment { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
+  .node-synthesize { background: var(--pink-bg); border-color: var(--pink); color: var(--pink); }
+  .node-distill { background: var(--pink-bg); border-color: var(--pink); color: var(--pink); }
+  .node-evidence { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+  .node-verify { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+  .node-critique { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+  .node-lint { background: var(--orange-bg); border-color: var(--orange); color: var(--orange); }
+
+  /* Phase sections */
+  .phase {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem 2.5rem;
+    margin: 1.5rem 0;
+    position: relative;
+  }
+  .phase::before {
+    content: attr(data-phase);
+    position: absolute;
+    top: -0.65rem;
+    left: 1.5rem;
+    background: var(--bg);
+    padding: 0 0.75rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+  }
+  .phase-research::before { color: var(--accent-light); }
+  .phase-experiment::before { color: var(--amber); }
+  .phase-synthesis::before { color: var(--pink); }
+  .phase-validation::before { color: var(--green); }
+
+  /* Experiment lifecycle detail */
+  .lifecycle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin: 1.5rem 0;
+  }
+  @media (max-width: 700px) { .lifecycle-grid { grid-template-columns: 1fr; } }
+
+  .lifecycle-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .lifecycle-card:hover { border-color: var(--accent); }
+  .lifecycle-card h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .lifecycle-card p { font-size: 0.85rem; color: var(--fg-muted); margin-bottom: 0; }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .badge-code { background: var(--accent-bg); color: var(--accent-light); }
+  .badge-convention { background: var(--amber-bg); color: var(--amber); }
+  .badge-skill { background: var(--green-bg); color: var(--green); }
+
+  /* Failure taxonomy */
+  .status-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.9rem;
+  }
+  .status-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg-muted);
+  }
+  .status-table td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .status-table tr:last-child td { border-bottom: none; }
+  .status-tag {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: monospace;
+  }
+  .tag-success { background: var(--green-bg); color: var(--green); }
+  .tag-partial { background: var(--amber-bg); color: var(--amber); }
+  .tag-inconclusive { background: var(--cyan-bg); color: var(--cyan); }
+  .tag-failed { background: var(--red-bg); color: var(--red); }
+
+  /* Layer diagram */
+  .layers {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 2rem 0;
+  }
+  .layer {
+    padding: 1.25rem 2rem;
+    border: 1px solid var(--border);
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .layer:first-child { border-radius: 12px 12px 0 0; }
+  .layer:last-child { border-radius: 0 0 12px 12px; }
+  .layer + .layer { border-top: none; }
+  .layer-name {
+    font-weight: 700;
+    font-size: 1rem;
+    min-width: 140px;
+  }
+  .layer-desc {
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+    flex: 1;
+    padding: 0 1.5rem;
+  }
+  .layer-files {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+    text-align: right;
+    min-width: 180px;
+  }
+  .layer-1 { background: rgba(99,102,241,0.06); }
+  .layer-2 { background: rgba(6,182,212,0.06); }
+  .layer-3 { background: rgba(245,158,11,0.06); }
+  .layer-4 { background: rgba(16,185,129,0.06); }
+  .layer-5 { background: rgba(236,72,153,0.06); }
+
+  /* Tool boxes */
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  @media (max-width: 700px) { .tools-grid { grid-template-columns: 1fr; } }
+
+  .tool-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  .tool-card h4 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+    font-family: monospace;
+  }
+  .tool-card p { font-size: 0.8rem; color: var(--fg-muted); margin-bottom: 0; }
+
+  /* Iteration loop SVG */
+  .iteration-diagram {
+    text-align: center;
+    margin: 2rem 0;
+  }
+  .iteration-diagram svg { max-width: 100%; height: auto; }
+
+  /* Code blocks */
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85em;
+    background: var(--surface-2);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    color: var(--accent-light);
+  }
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; }
+
+  /* Tree view */
+  .tree {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 2rem;
+    margin: 1.5rem 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+  }
+  .tree-root {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--fg);
+    margin-bottom: 0.5rem;
+    padding-left: 0.25rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  .tree-children {
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--border);
+    margin-left: 0.5rem;
+  }
+  .tree-item {
+    padding: 0.4rem 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem;
+    position: relative;
+  }
+  .tree-item::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    top: 50%;
+    width: 1.25rem;
+    height: 2px;
+    background: var(--border);
+  }
+  .tree-icon {
+    font-size: 0.6rem;
+    flex-shrink: 0;
+  }
+  .tree-name {
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .tree-desc {
+    color: var(--fg-muted);
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 400;
+  }
+  .tree-item .tree-children {
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+  }
+
+  /* Connector lines */
+  .connector {
+    display: flex;
+    justify-content: center;
+    padding: 0.25rem 0;
+  }
+  .connector .line {
+    width: 2px;
+    height: 20px;
+    background: var(--border);
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Research Flow Lifecycle</h1>
+    <p class="subtitle">A complete guide to the ML research workflow &mdash; from open questions to verified decisions, with every experiment tracked and every failure recorded.</p>
+    <div class="meta">
+      <span>MLX on Apple Silicon</span>
+      <span>MLflow Tracking</span>
+      <span>YAML Configs</span>
+      <span>Wiki-style Memory</span>
+      <span>Agent-native</span>
+    </div>
+  </div>
+
+  <!-- 1. Architecture Layers -->
+  <h2><span class="num">01</span> System Architecture</h2>
+
+  <div class="section-intro">
+    Five layers work together. Sources are immutable raw material. Memory is the evolving knowledge base. The Schema (CLAUDE.md) defines conventions. Experiments produce results. Outputs are the deliverables.
+  </div>
+
+  <div class="layers">
+    <div class="layer layer-1">
+      <div class="layer-name" style="color:var(--accent-light)">Sources</div>
+      <div class="layer-desc">Immutable raw material &mdash; papers, datasets, references. Never modified after ingest.</div>
+      <div class="layer-files">sources/</div>
+    </div>
+    <div class="layer layer-2">
+      <div class="layer-name" style="color:var(--cyan)">Memory</div>
+      <div class="layer-desc">LLM-maintained knowledge base &mdash; entities, findings, themes, open questions, decisions.</div>
+      <div class="layer-files">memory/</div>
+    </div>
+    <div class="layer layer-3">
+      <div class="layer-name" style="color:var(--amber)">Experiments</div>
+      <div class="layer-desc">YAML configs, training code (MLX), results (JSON), run log (JSONL), MLflow tracking.</div>
+      <div class="layer-files">experiments/</div>
+    </div>
+    <div class="layer layer-4">
+      <div class="layer-name" style="color:var(--green)">Outputs</div>
+      <div class="layer-desc">Evidence charts, verification scripts, worked examples, critical reviews, reports.</div>
+      <div class="layer-files">outputs/</div>
+    </div>
+    <div class="layer layer-5">
+      <div class="layer-name" style="color:var(--pink)">Schema</div>
+      <div class="layer-desc">Conventions, workflows, templates &mdash; the rules that govern everything above.</div>
+      <div class="layer-files">CLAUDE.md</div>
+    </div>
+  </div>
+
+  <!-- 2. The Research Loop -->
+  <h2><span class="num">02</span> The Research Loop</h2>
+
+  <div class="section-intro">
+    A research project cycles through these stages. The loop is not strictly linear &mdash; you can jump back to any earlier stage when new information demands it. The experiment sub-loop (stages 4-6) is where most iteration happens.
+  </div>
+
+  <div class="flow-diagram">
+    <!-- Row 1: Init to Analyze -->
+    <div class="flow-row">
+      <div class="flow-node node-init">
+        <div class="label">Stage 1</div>
+        Init
+        <div class="skill">/research</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-ingest">
+        <div class="label">Stage 2</div>
+        Ingest
+        <div class="skill">/analyze</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-analyze">
+        <div class="label">Stage 3</div>
+        Analyze
+        <div class="skill">/analyze</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-experiment">
+        <div class="label">Stage 4</div>
+        Experiment
+        <div class="skill">/experiment</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-synthesize">
+        <div class="label">Stage 5</div>
+        Synthesize
+        <div class="skill">/synthesize</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-distill">
+        <div class="label">Stage 6</div>
+        Distill
+        <div class="skill">/distill</div>
+      </div>
+    </div>
+
+    <div class="flow-arrow-down">&darr;</div>
+
+    <!-- Row 2: Validation & Presentation -->
+    <div class="flow-row">
+      <div class="flow-node node-evidence">
+        <div class="label">Stage 7</div>
+        Evidence
+        <div class="skill">/evidence</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-verify">
+        <div class="label">Stage 8</div>
+        Verify
+        <div class="skill">/verify</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-critique">
+        <div class="label">Stage 9</div>
+        Critique
+        <div class="skill">/critique</div>
+      </div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-node node-lint">
+        <div class="label">Stage 10</div>
+        Lint
+        <div class="skill">/lint</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Experiment Lifecycle (the core loop) -->
+  <h2><span class="num">03</span> Experiment Lifecycle</h2>
+
+  <div class="section-intro">
+    This is the core iteration loop. Every experiment starts with a question, produces a result, and feeds back into the knowledge base. The loop runs until the question is resolved or the research direction changes.
+  </div>
+
+  <!-- SVG Lifecycle Diagram -->
+  <div class="iteration-diagram">
+    <svg viewBox="0 0 800 520" xmlns="http://www.w3.org/2000/svg">
+      <!-- Defs -->
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#9ca3af"/>
+        </marker>
+        <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#10b981"/>
+        </marker>
+        <marker id="arrow-amber" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#f59e0b"/>
+        </marker>
+        <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+          <path d="M0,0 L8,4 L0,8 Z" fill="#dc2626"/>
+        </marker>
+      </defs>
+
+      <!-- Main flow: vertical -->
+      <!-- Question -->
+      <rect x="300" y="20" width="200" height="56" rx="12" fill="rgba(79,70,229,0.1)" stroke="#4f46e5" stroke-width="2"/>
+      <text x="400" y="42" text-anchor="middle" fill="#4338ca" font-size="11" font-weight="600" font-family="Inter,sans-serif">OPEN QUESTION</text>
+      <text x="400" y="58" text-anchor="middle" fill="#6b7280" font-size="10" font-family="monospace">memory/open-questions/</text>
+
+      <!-- Arrow down -->
+      <line x1="400" y1="76" x2="400" y2="108" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- Hypothesis -->
+      <rect x="300" y="110" width="200" height="56" rx="12" fill="rgba(217,119,6,0.1)" stroke="#f59e0b" stroke-width="2"/>
+      <text x="400" y="132" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600" font-family="Inter,sans-serif">HYPOTHESIS</text>
+      <text x="400" y="148" text-anchor="middle" fill="#6b7280" font-size="10" font-family="monospace">YAML config + criteria</text>
+
+      <!-- Arrow down -->
+      <line x1="400" y1="166" x2="400" y2="198" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- Experiment -->
+      <rect x="300" y="200" width="200" height="56" rx="12" fill="rgba(217,119,6,0.1)" stroke="#f59e0b" stroke-width="2"/>
+      <text x="400" y="222" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600" font-family="Inter,sans-serif">EXPERIMENT</text>
+      <text x="400" y="238" text-anchor="middle" fill="#6b7280" font-size="10" font-family="monospace">experiments/run.py</text>
+
+      <!-- Arrow down -->
+      <line x1="400" y1="256" x2="400" y2="288" stroke="#9ca3af" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- Result -->
+      <rect x="300" y="290" width="200" height="56" rx="12" fill="rgba(8,145,178,0.1)" stroke="#06b6d4" stroke-width="2"/>
+      <text x="400" y="312" text-anchor="middle" fill="#06b6d4" font-size="11" font-weight="600" font-family="Inter,sans-serif">RESULT</text>
+      <text x="400" y="328" text-anchor="middle" fill="#6b7280" font-size="10" font-family="monospace">JSON + JSONL + MLflow</text>
+
+      <!-- Branch: Success (right) -->
+      <line x1="500" y1="318" x2="610" y2="318" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-green)"/>
+      <rect x="615" y="290" width="170" height="56" rx="12" fill="rgba(5,150,105,0.1)" stroke="#10b981" stroke-width="2"/>
+      <text x="700" y="312" text-anchor="middle" fill="#10b981" font-size="11" font-weight="600" font-family="Inter,sans-serif">FINDING</text>
+      <text x="700" y="328" text-anchor="middle" fill="#6b7280" font-size="10" font-family="monospace">memory/findings/</text>
+      <text x="560" y="306" text-anchor="middle" fill="#10b981" font-size="10" font-weight="600" font-family="Inter,sans-serif">success</text>
+
+      <!-- Finding to Decision (down) -->
+      <line x1="700" y1="346" x2="700" y2="388" stroke="#10b981" stroke-width="2" marker-end="url(#arrow-green)"/>
+      <rect x="615" y="390" width="170" height="56" rx="12" fill="rgba(219,39,119,0.1)" stroke="#db2777" stroke-width="2"/>
+      <text x="700" y="412" text-anchor="middle" fill="#db2777" font-size="11" font-weight="600" font-family="Inter,sans-serif">DECISION</text>
+      <text x="700" y="428" text-anchor="middle" fill="#6b7280" font-size="10" font-family="monospace">memory/decisions/</text>
+
+      <!-- Decision to Baseline (down) -->
+      <line x1="700" y1="446" x2="700" y2="478" stroke="#db2777" stroke-width="2" marker-end="url(#arrow)"/>
+      <rect x="610" y="480" width="180" height="36" rx="8" fill="rgba(236,72,153,0.08)" stroke="#db2777" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="700" y="503" text-anchor="middle" fill="#db2777" font-size="10" font-weight="500" font-family="monospace">configs/baselines/*.yaml</text>
+
+      <!-- Branch: Partial / Negative (left) — loops back to hypothesis -->
+      <line x1="300" y1="318" x2="190" y2="318" stroke="#f59e0b" stroke-width="2"/>
+      <rect x="20" y="290" width="170" height="56" rx="12" fill="rgba(217,119,6,0.1)" stroke="#f59e0b" stroke-width="2"/>
+      <text x="105" y="312" text-anchor="middle" fill="#f59e0b" font-size="11" font-weight="600" font-family="Inter,sans-serif">NEGATIVE FINDING</text>
+      <text x="105" y="328" text-anchor="middle" fill="#6b7280" font-size="10" font-family="Inter,sans-serif">What to try next?</text>
+      <text x="240" y="306" text-anchor="middle" fill="#f59e0b" font-size="10" font-weight="600" font-family="Inter,sans-serif">partial</text>
+
+      <!-- Loop back arrow from Negative Finding to Hypothesis -->
+      <line x1="105" y1="290" x2="105" y2="138" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4"/>
+      <line x1="105" y1="138" x2="295" y2="138" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-amber)"/>
+      <text x="105" y="215" text-anchor="middle" fill="#f59e0b" font-size="9" font-weight="500" font-family="Inter,sans-serif" transform="rotate(-90,105,215)">ITERATE</text>
+
+      <!-- Branch: Failed (down from result) -->
+      <line x1="400" y1="346" x2="400" y2="390" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-red)"/>
+      <rect x="310" y="392" width="180" height="44" rx="10" fill="rgba(220,38,38,0.1)" stroke="#dc2626" stroke-width="2"/>
+      <text x="400" y="410" text-anchor="middle" fill="#dc2626" font-size="11" font-weight="600" font-family="Inter,sans-serif">FAILED</text>
+      <text x="400" y="425" text-anchor="middle" fill="#6b7280" font-size="9" font-family="monospace">config | bug | infra</text>
+
+      <!-- Loop back arrow from Failed to Experiment -->
+      <line x1="310" y1="414" x2="240" y2="414" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4"/>
+      <line x1="240" y1="414" x2="240" y2="228" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4"/>
+      <line x1="240" y1="228" x2="295" y2="228" stroke="#dc2626" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-red)"/>
+      <text x="228" y="330" text-anchor="middle" fill="#dc2626" font-size="9" font-weight="500" font-family="Inter,sans-serif" transform="rotate(-90,228,330)">FIX &amp; RETRY</text>
+
+      <!-- Question close arrow from Finding -->
+      <line x1="700" y1="290" x2="700" y2="48" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,4"/>
+      <line x1="700" y1="48" x2="505" y2="48" stroke="#10b981" stroke-width="1.5" stroke-dasharray="6,4" marker-end="url(#arrow-green)"/>
+      <text x="620" y="38" text-anchor="middle" fill="#10b981" font-size="9" font-weight="500" font-family="Inter,sans-serif">may close question</text>
+    </svg>
+  </div>
+
+  <!-- 4. What happens at each stage -->
+  <h2><span class="num">04</span> Stage Details</h2>
+
+  <div class="phase phase-research" data-phase="Research Phase">
+    <h3>1. Init &mdash; <code>/research</code></h3>
+    <p>Define the research goal. Create a GitHub issue. Create the branch (<code>research/GH-{id}-{slug}</code>). Scaffold memory structure.</p>
+
+    <h3>2. Ingest &mdash; <code>/analyze</code></h3>
+    <p>Feed a source (paper, URL, dataset). Extract entities and findings into memory. Log the operation.</p>
+
+    <h3>3. Analyze &mdash; <code>/analyze</code></h3>
+    <p>Read the goal + accumulated memory. Identify gaps. Generate new analysis. Surface open questions that need experiments.</p>
+  </div>
+
+  <div class="phase phase-experiment" data-phase="Experiment Phase">
+    <h3>4. Experiment &mdash; <code>/experiment</code></h3>
+    <div class="lifecycle-grid">
+      <div class="lifecycle-card">
+        <h4><span style="color:var(--accent-light)">A</span> Pick Question</h4>
+        <p>Select an open question from <code>memory/open-questions/</code>. Define a testable hypothesis with acceptance criteria.</p>
+      </div>
+      <div class="lifecycle-card">
+        <h4><span style="color:var(--amber)">B</span> Create Config</h4>
+        <p>Write a YAML config in <code>experiments/configs/</code> with <code>meta.question</code>, <code>meta.hypothesis</code>, and <code>meta.acceptance_criteria</code>.</p>
+      </div>
+      <div class="lifecycle-card">
+        <h4><span style="color:var(--green)">C</span> Run Experiment</h4>
+        <p><code>uv run python -m experiments.run config.yaml</code> &mdash; trains the model, logs to MLflow, writes results JSON and run-log entry.</p>
+      </div>
+      <div class="lifecycle-card">
+        <h4><span style="color:var(--pink)">D</span> Classify &amp; Record</h4>
+        <p>Classify outcome (success/partial/inconclusive/failed). Write finding to memory. Update log and index. Plan next iteration if needed.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase phase-synthesis" data-phase="Synthesis Phase">
+    <h3>5. Synthesize &mdash; <code>/synthesize</code></h3>
+    <p>Consolidate findings into themes. Resolve contradictions. Cross-reference related findings. Produce synthesis output.</p>
+
+    <h3>6. Distill &mdash; <code>/distill</code></h3>
+    <p>Extract actionable decisions from settled findings. Create decision records in <code>memory/decisions/</code>. Update or create baseline configs in <code>experiments/configs/baselines/</code>.</p>
+  </div>
+
+  <div class="phase phase-validation" data-phase="Validation & Presentation">
+    <h3>7-10. Evidence, Verify, Critique, Lint</h3>
+    <p>Generate charts backing claims. Write code to verify intermediate results. Adversarial review for gap analysis. Health-check memory for orphans and contradictions.</p>
+  </div>
+
+  <!-- 5. Failure Classification -->
+  <h2><span class="num">05</span> Failure Taxonomy</h2>
+
+  <div class="section-intro">
+    Every experiment gets classified. Negative results are first-class findings &mdash; they narrow the search space and prevent repeating dead ends.
+  </div>
+
+  <table class="status-table">
+    <thead>
+      <tr><th>Status</th><th>Meaning</th><th>Action</th><th>Creates Finding?</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="status-tag tag-success">success</span></td>
+        <td>Met acceptance criteria</td>
+        <td>Write positive finding, may close question</td>
+        <td style="color:var(--green)">Yes (positive)</td>
+      </tr>
+      <tr>
+        <td><span class="status-tag tag-partial">partial</span></td>
+        <td>Completed, missed criteria</td>
+        <td>Write negative finding, plan next iteration</td>
+        <td style="color:var(--amber)">Yes (negative)</td>
+      </tr>
+      <tr>
+        <td><span class="status-tag tag-inconclusive">inconclusive</span></td>
+        <td>Results ambiguous</td>
+        <td>Record, may re-run with more epochs or different seed</td>
+        <td style="color:var(--cyan)">Yes (inconclusive)</td>
+      </tr>
+      <tr>
+        <td><span class="status-tag tag-failed">failed:config</span></td>
+        <td>Bad config (OOM, shape mismatch)</td>
+        <td>Fix config, re-run</td>
+        <td style="color:var(--fg-muted)">No</td>
+      </tr>
+      <tr>
+        <td><span class="status-tag tag-failed">failed:bug</span></td>
+        <td>Code bug crashed training</td>
+        <td>Fix bug, re-run</td>
+        <td style="color:var(--fg-muted)">No</td>
+      </tr>
+      <tr>
+        <td><span class="status-tag tag-failed">failed:infra</span></td>
+        <td>Infrastructure issue (disk, memory)</td>
+        <td>Re-run when stable</td>
+        <td style="color:var(--fg-muted)">No</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 6. Tooling -->
+  <h2><span class="num">06</span> Tooling &amp; Infrastructure</h2>
+
+  <div class="tools-grid">
+    <div class="tool-card">
+      <h4 style="color:var(--accent-light)">uv</h4>
+      <p>Package management. <code>uv sync</code> to install, <code>uv add</code> to add deps, <code>uv run</code> to execute.</p>
+    </div>
+    <div class="tool-card">
+      <h4 style="color:var(--amber)">MLflow</h4>
+      <p>Experiment tracking. Params, metrics, model artifacts. <code>--mlflow</code> flag on trainer.</p>
+    </div>
+    <div class="tool-card">
+      <h4 style="color:var(--green)">MLX</h4>
+      <p>Apple Silicon ML framework. Native Metal acceleration. All training runs on M4.</p>
+    </div>
+    <div class="tool-card">
+      <h4 style="color:var(--cyan)">YAML Configs</h4>
+      <p>Experiment definitions in <code>experiments/configs/</code>. Baselines, sweeps, with metadata linking to questions.</p>
+    </div>
+    <div class="tool-card">
+      <h4 style="color:var(--pink)">Run Log</h4>
+      <p>Append-only JSONL at <code>experiments/results/run-log.jsonl</code>. Every run tracked with status and metrics.</p>
+    </div>
+    <div class="tool-card">
+      <h4 style="color:var(--orange)">Git Flow</h4>
+      <p><code>research/</code> &rarr; <code>hypothesis/</code> &rarr; <code>synthesis/</code> branches. Each tied to GitHub issues.</p>
+    </div>
+  </div>
+
+  <!-- 7. Memory Structure -->
+  <h2><span class="num">07</span> Memory Structure</h2>
+
+  <div class="tree">
+    <div class="tree-root">memory/</div>
+    <div class="tree-children">
+      <div class="tree-item tree-file">
+        <span class="tree-icon" style="color:var(--accent)">&#9679;</span>
+        <span class="tree-name">index.md</span>
+        <span class="tree-desc">Catalog of all pages (auto-updated)</span>
+      </div>
+      <div class="tree-item tree-file">
+        <span class="tree-icon" style="color:var(--accent)">&#9679;</span>
+        <span class="tree-name">log.md</span>
+        <span class="tree-desc">Append-only chronological record</span>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--cyan)">&#9654;</span>
+        <span class="tree-name">entities/</span>
+        <span class="tree-desc">Papers, researchers, concepts, tools</span>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--amber)">&#9654;</span>
+        <span class="tree-name">findings/</span>
+        <span class="tree-desc">Experiment results + analysis insights</span>
+        <div class="tree-children">
+          <div class="tree-item tree-file">
+            <span class="tree-icon" style="color:var(--green)">&#9679;</span>
+            <span class="tree-name">experiment-*.md</span>
+            <span class="tree-desc">Each experiment gets a finding (positive, negative, or inconclusive)</span>
+          </div>
+        </div>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--pink)">&#9654;</span>
+        <span class="tree-name">themes/</span>
+        <span class="tree-desc">Cross-cutting patterns across findings</span>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--red)">&#9654;</span>
+        <span class="tree-name">open-questions/</span>
+        <span class="tree-desc">Gaps identified, queued for experiments</span>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--pink)">&#9654;</span>
+        <span class="tree-name">decisions/</span>
+        <span class="tree-desc">Distilled actionable decisions</span>
+        <div class="tree-children">
+          <div class="tree-item tree-file">
+            <span class="tree-icon" style="color:var(--pink)">&#9679;</span>
+            <span class="tree-name">decision-*.md</span>
+            <span class="tree-desc">Links evidence findings + baseline config</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:2rem">
+    <div class="tree-root">experiments/</div>
+    <div class="tree-children">
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--amber)">&#9654;</span>
+        <span class="tree-name">configs/</span>
+        <span class="tree-desc">YAML experiment definitions</span>
+        <div class="tree-children">
+          <div class="tree-item tree-dir">
+            <span class="tree-icon" style="color:var(--green)">&#9654;</span>
+            <span class="tree-name">baselines/</span>
+            <span class="tree-desc">Verified best configs per task</span>
+          </div>
+          <div class="tree-item tree-dir">
+            <span class="tree-icon" style="color:var(--cyan)">&#9654;</span>
+            <span class="tree-name">sweeps/</span>
+            <span class="tree-desc">Multi-variant sweep definitions</span>
+          </div>
+        </div>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--accent)">&#9654;</span>
+        <span class="tree-name">results/</span>
+        <span class="tree-desc">Experiment outputs</span>
+        <div class="tree-children">
+          <div class="tree-item tree-file">
+            <span class="tree-icon" style="color:var(--accent)">&#9679;</span>
+            <span class="tree-name">*.json</span>
+            <span class="tree-desc">Per-run results with epoch logs</span>
+          </div>
+          <div class="tree-item tree-file">
+            <span class="tree-icon" style="color:var(--orange)">&#9679;</span>
+            <span class="tree-name">run-log.jsonl</span>
+            <span class="tree-desc">Append-only registry of all runs</span>
+          </div>
+        </div>
+      </div>
+      <div class="tree-item tree-dir">
+        <span class="tree-icon" style="color:var(--fg-muted)">&#9654;</span>
+        <span class="tree-name">training/</span>
+        <span class="tree-desc">MLX trainer, evaluator</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Finding Types</h3>
+  <div class="lifecycle-grid">
+    <div class="lifecycle-card">
+      <h4 style="color:var(--green)">Positive Finding</h4>
+      <p>Experiment met criteria. Records: Insight, Evidence, Key Observations, Counter-arguments, Implications.</p>
+    </div>
+    <div class="lifecycle-card">
+      <h4 style="color:var(--amber)">Negative Finding</h4>
+      <p>Experiment failed criteria. Additionally records: Why It Failed, What This Rules Out, What This Suggests Instead.</p>
+    </div>
+  </div>
+
+  <h3>Decision Record</h3>
+  <div class="lifecycle-card" style="margin-top:0.75rem">
+    <h4 style="color:var(--pink)">Distilled Decision</h4>
+    <p>Created by <code>/distill</code> from multiple settled findings. Contains: Decision statement, Rationale, Tradeoffs Accepted, Revert Conditions. Links to evidence findings and a baseline config YAML.</p>
+  </div>
+
+  <!-- 8. Example: Full Cycle -->
+  <h2><span class="num">08</span> Example: A Full Research Cycle</h2>
+
+  <div class="section-intro">
+    Tracing one question through the complete lifecycle, using actual results from this project's arithmetic transformer research.
+  </div>
+
+  <div class="phase phase-research" data-phase="Step 1: Question">
+    <p><strong>Open Question:</strong> "Can a 2-layer model with scratchpad solve 3-digit multiplication?"</p>
+    <p>File: <code>memory/open-questions/optimal-multiplication-scratchpad-format.md</code></p>
+  </div>
+
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="phase phase-experiment" data-phase="Step 2: Hypothesis + Config">
+    <p><strong>Hypothesis:</strong> "Scratchpad enables 2L/384D to achieve &gt;99% on 3-digit multiplication"</p>
+    <p><strong>Config:</strong> <code>experiments/configs/baselines/mul-3d-scratchpad-2L384D.yaml</code></p>
+    <pre><code>meta:
+  name: "mul-3d-scratchpad-2L384D"
+  question: "optimal-multiplication-scratchpad-format"
+  acceptance_criteria: "&gt;99% accuracy on 3-digit multiplication"
+
+task:
+  op: mul
+  max_digits: 3
+  scratchpad: true
+
+architecture:
+  n_layers: 2
+  dim: 384
+  ff_dim: 1536</code></pre>
+  </div>
+
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="phase phase-experiment" data-phase="Step 3: Run">
+    <p><strong>Command:</strong></p>
+    <pre><code>uv run python -m experiments.run experiments/configs/baselines/mul-3d-scratchpad-2L384D.yaml</code></pre>
+    <p><strong>Result:</strong> <span class="status-tag tag-success">success</span> &mdash; 100% accuracy, 3,567,744 params, ~3000s training</p>
+    <p>Run log entry appended to <code>experiments/results/run-log.jsonl</code></p>
+  </div>
+
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="phase phase-synthesis" data-phase="Step 4: Finding + Decision">
+    <p><strong>Finding:</strong> <code>memory/findings/experiment-scratchpad-2L384D.md</code></p>
+    <p><em>"Scratchpad pushes 2L/384D mult from 85% to 100%. Scratchpad eliminates the depth bottleneck &mdash; 2L/384D is now a universal architecture for all single-operation tasks."</em></p>
+
+    <p style="margin-top:1rem"><strong>Decision (after distillation):</strong> "Use 2L/4H/384D + scratchpad as the standard multiplication architecture. SwiGLU optional for faster convergence."</p>
+    <p>Baseline config verified and tagged <code>["baseline", "verified"]</code>.</p>
+  </div>
+
+  <div class="connector"><div class="line"></div></div>
+
+  <div class="phase phase-validation" data-phase="Step 5: Question Resolved">
+    <p>Open question status updated to <code>resolved</code>. The scratchpad format question spawned further research into 5-digit multiplication (77.85% &mdash; partial result, iteration continues).</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>Research Flow &mdash; An agentic research system with persistent working memory</p>
+    <p style="margin-top:0.5rem">Generated 2026-04-15 &middot; dangquan1402/research-flow</p>
+  </div>
+
+</div>
+</body>
+</html>
