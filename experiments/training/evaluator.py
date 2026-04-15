@@ -6,10 +6,10 @@ from ..tokenizer import (
     BOS_ID,
     EOS_ID,
     PAD_ID,
-    encode,
-    decode,
-    compute_input_position_ids,
     PC_DIGIT_BASE,
+    compute_input_position_ids,
+    decode,
+    encode,
 )
 
 

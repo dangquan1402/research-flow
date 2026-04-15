@@ -3,7 +3,7 @@
 import mlx.core as mx
 import mlx.nn as nn
 
-from ..tokenizer import VOCAB_SIZE, PC_MAX_POS
+from ..tokenizer import PC_MAX_POS, VOCAB_SIZE
 from . import register_model
 from .base import RMSNorm, TransformerBlock
 

@@ -12,9 +12,9 @@ import math
 import mlx.core as mx
 import mlx.nn as nn
 
-from ..tokenizer import VOCAB_SIZE, TOK2ID, PC_MAX_POS
+from ..tokenizer import PC_MAX_POS, TOK2ID, VOCAB_SIZE
 from . import register_model
-from .base import RMSNorm, MultiHeadAttention, FeedForward, TransformerBlock
+from .base import FeedForward, MultiHeadAttention, RMSNorm, TransformerBlock
 
 EQ_ID = TOK2ID["="]
 

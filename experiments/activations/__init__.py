@@ -18,4 +18,6 @@ def get_activation(name):
     return ACTIVATION_REGISTRY[name]
 
 
-from . import gelu as gelu, swiglu as swiglu, relu_squared as relu_squared  # noqa: E402
+from . import gelu as gelu  # noqa: E402
+from . import relu_squared as relu_squared
+from . import swiglu as swiglu
