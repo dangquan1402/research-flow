@@ -103,6 +103,84 @@ aliases: []
 - Related to [other-entity] because [reason]
 ```
 
+## Negative Finding Template
+
+For experiments that completed but did not meet acceptance criteria:
+
+```yaml
+---
+title: "Negative Result: [What failed and why]"
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+source: experiments/results/{result-file}.json
+confidence: high
+verification: source
+outcome: negative
+tags: [experiment, negative-result, ...]
+related: []
+staleness_days: 0
+---
+
+## Insight
+
+[What we expected vs what happened]
+
+## Evidence
+
+[The actual numbers — accuracy, loss, training curves]
+
+## Why It Failed
+
+[Root cause analysis — was the hypothesis wrong, or was the test wrong?]
+
+## What This Rules Out
+
+[What we can now confidently NOT pursue]
+
+## What This Suggests Instead
+
+[Redirect — what should we try next?]
+
+## Counter-arguments
+
+[What would disprove this negative conclusion?]
+```
+
+## Decision Record Template
+
+For distilled decisions backed by multiple experiment findings:
+
+```yaml
+---
+title: "Decision: [Concise actionable statement]"
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+status: active
+supersedes: null
+evidence:
+  - finding-slug-1
+  - finding-slug-2
+config: baselines/config-name.yaml
+tags: [architecture, training, data]
+---
+
+## Decision
+
+[One-sentence actionable statement]
+
+## Rationale
+
+[Summary of evidence from linked findings]
+
+## Tradeoffs Accepted
+
+[What we gave up and why it is acceptable]
+
+## Revert Conditions
+
+[Under what circumstances this decision should be revisited]
+```
+
 ## Theme Template
 
 ```markdown
