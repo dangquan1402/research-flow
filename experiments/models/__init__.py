@@ -19,4 +19,6 @@ def get_model(name, **kwargs):
 
 
 # Auto-import to trigger registration
-from . import decoder_only as decoder_only, looped as looped, encoder_decoder as encoder_decoder  # noqa: E402
+from . import decoder_only as decoder_only  # noqa: E402
+from . import encoder_decoder as encoder_decoder
+from . import looped as looped

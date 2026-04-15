@@ -119,6 +119,38 @@ Pages track `staleness_days` in frontmatter. `/lint` increments this. Pages >30 
 ### Entity Registry
 `memory/entity-registry.json` prevents duplicate entity pages. Always check before creating.
 
+## ML Experiment Tracking (MLflow)
+
+All ML experiments are tracked with MLflow. Dependencies in `pyproject.toml`.
+
+### Setup
+```bash
+uv sync                             # install all deps including mlflow
+uv run mlflow ui --port 5000        # launch UI at http://localhost:5000
+```
+
+Tracking URI defaults to `file:./mlruns` (local). For server mode:
+```bash
+mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlartifacts --port 5000
+```
+
+### Conventions
+- **Experiment naming**: match research questions — `{op}-{digits}d-{slug}` (e.g., `mul-5d-scratchpad`, `swiglu-vs-relu-faircomp`)
+- **Run naming**: embed distinguishing config — `{arch}-{layers}L-{tag}` (e.g., `looped-6L-scratchpad`)
+- **Params**: flat dot-notation keys (`model.n_layers`, `train.lr`, `data.max_digits`)
+- **Metrics**: `train_loss` every eval epoch, `val_accuracy` per eval epoch, `digit_accuracy/{n}d` per digit count
+- **Artifacts**: best model weights (`.safetensors`/`.npz`), config snapshot
+- **Tags**: `git_commit`, `architecture`, `research_question`, `stage` (exploration/refinement/final)
+- Nested runs for hyperparameter sweeps (parent/child)
+- Only log model weights for best checkpoints, not every epoch
+
+### Integration
+The trainer (`experiments/training/trainer.py`) auto-logs to MLflow when `--mlflow` flag is passed:
+```bash
+python -m experiments.train --op mul --max_digits 5 --mlflow
+python -m experiments.train --op mul --max_digits 5 --mlflow --mlflow_experiment "mul-5d-scratchpad"
+```
+
 ## Conventions
 
 - Commit messages: `{type}({scope}): description` (e.g., `research(transformers): ingest attention paper`)
@@ -128,3 +160,4 @@ Pages track `staleness_days` in frontmatter. `/lint` increments this. Pages >30 
 - Sources are immutable after creation (enforced by hook)
 - Always run `pre-commit` and `ruff` after coding changes
 - Templates for all memory pages in `docs/memory-page-template.md`
+- Dependencies managed with `uv` — `pyproject.toml` + `uv.lock`. Install: `uv sync`. Add deps: `uv add <pkg>`. Run commands: `uv run <cmd>`

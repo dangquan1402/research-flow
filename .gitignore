@@ -6,4 +6,15 @@ __pycache__/
 .vscode/
 .idea/
 node_modules/
-__pycache__/
+
+# uv / venv
+.venv/
+
+# MLflow experiment tracking
+mlruns/
+mlartifacts/
+mlflow.db
+
+# Experiment artifacts
+experiments/results/*.partial.json
+experiments/checkpoints/
