@@ -91,14 +91,93 @@ memory/
 1. **Init** (`/research`) — Define goal → create issue → create branch → scaffold
 2. **Ingest** (`/analyze`) — Feed source → extract entities/findings → update memory → log
 3. **Analyze** (`/analyze`) — Read goal + memory → identify gaps → generate new analysis → update memory
-4. **Synthesize** (`/synthesize`) — Consolidate findings → build themes → resolve contradictions → produce output
-5. **Evidence** (`/evidence`) — Generate charts, tables, plots backing key claims → `outputs/evidence/`
-6. **Verify** (`/verify`) — Generate code that checks intermediate & final claims → `outputs/verification/`
-7. **Examples** (`/examples`) — Generate worked examples illustrating findings → `outputs/examples/`
-8. **Critique** (`/critique`) — Adversarial review of results, gap analysis, honest write-up → `outputs/critiques/`
-9. **Lint** (`/lint`) — Health-check memory: orphans, contradictions, staleness, missing cross-refs
+4. **Experiment** (`/experiment`) — Design hypothesis → create config → run → classify → write finding (see below)
+5. **Synthesize** (`/synthesize`) — Consolidate findings → build themes → resolve contradictions → produce output
+6. **Distill** (`/distill`) — Extract decisions from settled findings → baseline configs → decision records
+7. **Evidence** (`/evidence`) — Generate charts, tables, plots backing key claims → `outputs/evidence/`
+8. **Verify** (`/verify`) — Generate code that checks intermediate & final claims → `outputs/verification/`
+9. **Examples** (`/examples`) — Generate worked examples illustrating findings → `outputs/examples/`
+10. **Critique** (`/critique`) — Adversarial review of results, gap analysis, honest write-up → `outputs/critiques/`
+11. **Lint** (`/lint`) — Health-check memory: orphans, contradictions, staleness, missing cross-refs
 
-Steps 5-8 form the **validation & presentation layer** — they can be run in any order after synthesis, and each strengthens the others (e.g., verification failures inform critique, examples clarify evidence).
+Steps 7-10 form the **validation & presentation layer** — they can be run in any order after synthesis, and each strengthens the others (e.g., verification failures inform critique, examples clarify evidence).
+
+## ML Experiment Workflow
+
+The experiment lifecycle connects open questions to actionable decisions:
+
+```
+QUESTION (memory/open-questions/)
+    |
+    v
+HYPOTHESIS (YAML config with acceptance_criteria)
+    |
+    v
+EXPERIMENT (uv run python -m experiments.run <config.yaml>)
+    |
+    v
+RESULT (experiments/results/*.json + run-log.jsonl + MLflow)
+    |
+    |-- success -------> FINDING --> may close QUESTION
+    |-- partial -------> NEGATIVE FINDING --> refine HYPOTHESIS --> new EXPERIMENT
+    |-- inconclusive --> adjust config --> re-run
+    |-- failed:* ------> fix issue --> re-run
+    |
+    v (periodically)
+DISTILL --> DECISION RECORD (memory/decisions/) + BASELINE CONFIG
+```
+
+### YAML Experiment Configs
+
+Configs live in `experiments/configs/` — see `experiments/configs/README.md` for full schema.
+
+```bash
+# Run single experiment from config
+uv run python -m experiments.run experiments/configs/baselines/add-5d-reversed-2L384D.yaml
+
+# Run a sweep (multiple variants)
+uv run python -m experiments.run experiments/configs/sweeps/depth-vs-width.yaml
+
+# Batch run all baselines
+uv run python -m experiments.run experiments/configs/baselines/*.yaml
+
+# Dry run (preview without training)
+uv run python -m experiments.run --dry-run experiments/configs/baselines/*.yaml
+```
+
+### Failure Classification
+
+Every experiment result gets a status in `experiments/results/run-log.jsonl`:
+
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `success` | Met acceptance criteria | Write positive finding |
+| `partial` | Completed, missed criteria | Write negative finding, iterate |
+| `inconclusive` | Ambiguous results | Record, may re-run with more epochs |
+| `failed:config` | Bad config (OOM, shape mismatch) | Fix config, re-run |
+| `failed:bug` | Code bug | Fix bug, re-run |
+| `failed:infra` | Infrastructure issue | Re-run later |
+
+### Decision Records
+
+Distilled from settled findings into `memory/decisions/`. Each decision:
+- Links to evidence (finding slugs)
+- References a baseline config in `experiments/configs/baselines/`
+- Has revert conditions (when to revisit)
+- Status: `active` | `superseded` | `reverted`
+
+### Memory Structure (extended)
+
+```
+memory/
+├── decisions/        # Distilled actionable decisions from findings
+├── entities/         # People, orgs, concepts, tools
+├── findings/         # Discrete insights (positive, negative, inconclusive)
+├── themes/           # Cross-cutting patterns
+├── open-questions/   # Gaps identified, queued for experiments
+├── index.md          # Catalog of all pages
+└── log.md            # Append-only operation log
+```
 
 ## Quality Patterns
 
