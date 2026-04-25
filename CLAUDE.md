@@ -21,6 +21,23 @@ outputs/
 └── *.md            # Final deliverables (reports, specs)
 ```
 
+## Commands
+
+- `uv sync` — install deps (mlx, mlflow, loguru, etc.; py>=3.12)
+- `uv run ruff check .` / `uv run ruff format .` — lint/format (line-length 100, rules `E,F,I,W`)
+- `uv run pre-commit run --all-files` — run all pre-commit hooks
+- `uv run python -m experiments.run <config.yaml>` — **primary** experiment entry point (YAML-driven, logs to `experiments/results/run-log.jsonl` and MLflow). Supports globs and `--dry-run`.
+- `uv run python -m experiments.train --op <add|mul> --max_digits N [--mlflow]` — direct CLI training entry point (bypasses YAML configs; legacy/ad-hoc use)
+- `uv run mlflow ui --port 5000` — open MLflow UI
+
+## Automation Hooks
+
+`.claude/hooks/` enforce repo invariants. Don't fight them — they encode rules from CLAUDE.md:
+
+- **`block-source-modification.sh`** (PreToolUse, `Edit`) — rejects `Edit` on anything under `sources/`. Sources are immutable; create a new `memory/findings/` page instead.
+- **`block-commit-protected-branch.sh`** (PreToolUse, `Bash`) — blocks `git commit` while on `main`. Create a `research/`, `hypothesis/`, `synthesis/`, or `review/` branch first.
+- **`post-memory-update.sh`** (PostToolUse, `Edit|Write`) — after editing anything in `memory/` (other than `index.md`/`log.md`/`entity-registry.json`), prints a reminder to update `memory/index.md` and append to `memory/log.md`. Do it in the same turn.
+
 ## Git Flow for Research
 
 | Branch Type | Base | Prefix | Purpose |
@@ -47,6 +64,7 @@ Example: `hypothesis/GH-7-attention-mechanisms`, `synthesis/GH-5-consolidate-tra
 - Project board columns: `Backlog | In Progress | Synthesizing | Done`
 - Link all branches to their issues
 - Use `gh project item-add 4 --owner dangquan1402 --url {issue_url}` to add issues to project
+- Issue templates live in `.github/ISSUE_TEMPLATE/`: `research-goal.md`, `hypothesis.md`, `finding.md` — use them when opening issues so labels/structure are correct
 
 ### Multi-Agent Dispatch
 
@@ -64,12 +82,14 @@ Each agent gets its own worktree (isolated branch). No conflicts during parallel
 
 ```
 memory/
-├── index.md          # Catalog of all pages with summaries (updated every ingest)
-├── log.md            # Append-only chronological record of all operations
-├── entities/         # People, orgs, concepts, tools discovered
-├── findings/         # Discrete insights with evidence + citations
-├── themes/           # Cross-cutting patterns across findings
-└── open-questions/   # Gaps identified, queued for next cycle
+├── index.md             # Catalog of all pages with summaries (updated every ingest)
+├── log.md               # Append-only chronological record of all operations
+├── entity-registry.json # Dedup index — check before creating an entity page
+├── entities/            # People, orgs, concepts, tools discovered
+├── findings/            # Discrete insights (positive, negative, inconclusive) with citations
+├── themes/              # Cross-cutting patterns across findings
+├── open-questions/      # Gaps identified, queued for experiments
+└── decisions/           # Distilled actionable decisions (from `/distill`)
 ```
 
 ### Memory Rules
@@ -99,6 +119,9 @@ memory/
 9. **Examples** (`/examples`) — Generate worked examples illustrating findings → `outputs/examples/`
 10. **Critique** (`/critique`) — Adversarial review of results, gap analysis, honest write-up → `outputs/critiques/`
 11. **Lint** (`/lint`) — Health-check memory: orphans, contradictions, staleness, missing cross-refs
+
+**Ingest helpers:**
+- **`/read-pdf`** — Render a PDF (paper, report, scan) to one PNG per page via PyMuPDF, then read the images directly. Preserves figures, tables, equations, and scanned text that text extraction would lose. Output goes to `sources/_pdf-images/<slug>/`.
 
 Steps 7-10 form the **validation & presentation layer** — they can be run in any order after synthesis, and each strengthens the others (e.g., verification failures inform critique, examples clarify evidence).
 
@@ -166,19 +189,6 @@ Distilled from settled findings into `memory/decisions/`. Each decision:
 - Has revert conditions (when to revisit)
 - Status: `active` | `superseded` | `reverted`
 
-### Memory Structure (extended)
-
-```
-memory/
-├── decisions/        # Distilled actionable decisions from findings
-├── entities/         # People, orgs, concepts, tools
-├── findings/         # Discrete insights (positive, negative, inconclusive)
-├── themes/           # Cross-cutting patterns
-├── open-questions/   # Gaps identified, queued for experiments
-├── index.md          # Catalog of all pages
-└── log.md            # Append-only operation log
-```
-
 ## Quality Patterns
 
 ### Verification Gates
@@ -202,16 +212,7 @@ Pages track `staleness_days` in frontmatter. `/lint` increments this. Pages >30 
 
 All ML experiments are tracked with MLflow. Dependencies in `pyproject.toml`.
 
-### Setup
-```bash
-uv sync                             # install all deps including mlflow
-uv run mlflow ui --port 5000        # launch UI at http://localhost:5000
-```
-
-Tracking URI defaults to `file:./mlruns` (local). For server mode:
-```bash
-mlflow server --backend-store-uri sqlite:///mlflow.db --default-artifact-root ./mlartifacts --port 5000
-```
+Tracking URI defaults to `file:./mlruns`. UI: `uv run mlflow ui --port 5000`.
 
 ### Conventions
 - **Experiment naming**: match research questions — `{op}-{digits}d-{slug}` (e.g., `mul-5d-scratchpad`, `swiglu-vs-relu-faircomp`)
